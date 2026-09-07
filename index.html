@@ -2,15 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri App</title>
-    <script type="module" src="/main.js" defer></script>
+  
   </head>
 
-  <body>
+  <body class="bg-gray-200">
     <main class="container">
-      <h1>Welcome to Tauri</h1>
+      <h1 class="text-3xl text-red-500">Musu Go</h1>
       <div class="row">
         <a href="https://tauri.app" target="_blank">
           <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
@@ -34,5 +33,7 @@
       </form>
       <p id="greet-msg"></p>
     </main>
+
+     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
