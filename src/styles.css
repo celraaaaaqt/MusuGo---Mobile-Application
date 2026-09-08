@@ -98,3 +98,18 @@
   --radius-2xl: 1.5rem;
 }
 
+/* marqueee animation here */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  width: max-content;
+  animation: marquee 25s linear infinite;
+}

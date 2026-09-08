@@ -26,7 +26,7 @@
   <title>Musu Go</title>
 </head>
 
-<body class="bg-neutral-50 text-neutral-900 font-poppins">
+<body class="bg-neutral-50 text-neutral-900 font-poppins pb-10">
 
   <div class="min-h-screen flex flex-col">
 
@@ -235,7 +235,7 @@
                    transition"
             data-category="meals"
           >
-            Meals
+            Classic MusuGo Meals
           </button>
 
           <button
@@ -252,50 +252,13 @@
                    transition"
             data-category="snacks"
           >
-            Snacks
-          </button>
-
-          <button
-            class="category-btn
-                   shrink-0
-                   px-5 py-3
-                   rounded-full
-                   bg-white
-                   border border-neutral-200
-                   text-secondary-600
-                   font-semibold
-                   text-sm
-                   hover:border-primary-300
-                   transition"
-            data-category="drinks"
-          >
-            Drinks
-          </button>
-
-          <button
-            class="category-btn
-                   shrink-0
-                   px-5 py-3
-                   rounded-full
-                   bg-white
-                   border border-neutral-200
-                   text-secondary-600
-                   font-semibold
-                   text-sm
-                   hover:border-primary-300
-                   transition"
-            data-category="desserts"
-          >
-            Desserts
+            Spicy MusuGo
           </button>
 
         </div>
 
 
-        <!-- ===================================== -->
         <!-- SECTION TITLE -->
-        <!-- ===================================== -->
-
         <div class="flex items-end justify-between mb-4">
 
           <div>
@@ -710,7 +673,42 @@
     </main>
 
   </div>
+<!-- Bottom Marquee -->
+<div
+  class="fixed bottom-0 left-0 right-0 z-50
+         h-10
+         bg-secondary-600
+         text-white
+         overflow-hidden
+         flex items-center"
+>
+  <div class="marquee-track flex whitespace-nowrap">
+    <div class="marquee-content flex items-center gap-12 px-6">
+      <span class="font-sans font-semibold text-sm">
+        Thank you for choosing MusuGo!
+      </span>
 
+      <span class="text-tertiary-400">•</span>
+
+      <span class="font-sans font-medium text-sm">
+        Quality you can taste — Value you can trust!
+      </span>
+
+      <span class="text-tertiary-400">•</span>
+
+      <span class="font-sans font-semibold text-sm">
+        Checkout NOW!
+      </span>
+
+      <span class="text-tertiary-400">•</span>
+
+      <span class="font-sans font-medium text-sm">
+        Thank you for choosing MusuGo!
+      </span>
+    </div>
+
+  </div>
+</div>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
