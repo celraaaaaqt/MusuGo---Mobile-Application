@@ -1,2 +1,100 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary-50: #FFF1EF;
+  --color-primary-100: #FFE1DD;
+  --color-primary-200: #FFC7BF;
+  --color-primary-300: #FFA294;
+  --color-primary-400: #FF7D6C;
+  --color-primary-500: #FF5C4D;
+  --color-primary-600: #F23D2C;
+  --color-primary-700: #CC2E1F;
+  --color-primary-800: #A6281C;
+  --color-primary-900: #7A1F17;
+
+  --color-secondary-50: #E8ECEA;
+  --color-secondary-100: #C7D1CC;
+  --color-secondary-200: #A0AFA8;
+  --color-secondary-300: #748C81;
+  --color-secondary-400: #4D6B5E;
+  --color-secondary-500: #2E4A3D;
+  --color-secondary-600: #1A2E26;
+  --color-secondary-700: #14241D;
+  --color-secondary-800: #0F1A15;
+  --color-secondary-900: #0A120E;
+
+  --color-tertiary-50: #FFF8E1;
+  --color-tertiary-100: #FFECB3;
+  --color-tertiary-200: #FFDF80;
+  --color-tertiary-300: #FFD24D;
+  --color-tertiary-400: #FFC826;
+  --color-tertiary-500: #FFB800;
+  --color-tertiary-600: #E6A600;
+  --color-tertiary-700: #B38100;
+  --color-tertiary-800: #805C00;
+  --color-tertiary-900: #4D3700;
+
+  --color-neutral-50: #FDFCF8;
+  --color-neutral-100: #F5F4EF;
+  --color-neutral-200: #E8E6DE;
+  --color-neutral-300: #D1CFC5;
+  --color-neutral-400: #A8A599;
+  --color-neutral-500: #7D7A6E;
+  --color-neutral-600: #57544A;
+  --color-neutral-700: #38362E;
+  --color-neutral-800: #211F1A;
+  --color-neutral-900: #0F0E0C;
+
+    /* =========================
+     FONTS
+     ========================= */
+
+  --font-heading: "Montserrat", ui-sans-serif, sans-serif;
+  --font-sans: "Poppins", ui-sans-serif, sans-serif;
+  --font-jakarta: "Plus Jakarta Sans", ui-sans-serif, sans-serif;
+--font-manrope: "Manrope", ui-sans-serif, sans-serif;
+
+
+  /* =========================
+     FONT SIZES
+     ========================= */
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.1;
+
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1.1;
+
+
+  /* =========================
+     BORDER RADIUS
+     ========================= */
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+}
+
