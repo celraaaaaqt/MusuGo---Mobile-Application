@@ -256,11 +256,7 @@ function renderCart() {
 
   });
 
-
-  // ================================
-  // INCREASE ITEM
-  // ================================
-
+  //increase item
   document.querySelectorAll(".increase-item").forEach((button) => {
 
     button.addEventListener("click", () => {
