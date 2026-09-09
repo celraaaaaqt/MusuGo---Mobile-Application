@@ -113,3 +113,41 @@
   width: max-content;
   animation: marquee 25s linear infinite;
 }
+
+.swal-actions {
+  display: flex !important;
+  gap: 15px !important;
+}
+
+.swal2-container {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.swal-confirm {
+  background-color: #dc2626 !important;
+  color: white !important;
+  padding: 10px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: var(--text-base);
+}
+
+.swal-confirm:hover {
+  background-color: #b91c1c !important;
+}
+
+.swal-cancel {
+  background-color: #f5f5f5 !important;
+  color: #404040 !important;
+  padding: 10px 7px;
+  border-radius: 10px; 
+  font-weight: 500;
+  font-size: var(--text-base);
+  border: 1px solid var(--color-neutral-300);
+}
+
+.swal-cancel:hover {
+  background-color: #e5e5e5 !important;
+}

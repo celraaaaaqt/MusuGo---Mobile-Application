@@ -24,6 +24,7 @@
   rel="stylesheet"
 />
   <title>Musu Go</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="bg-neutral-50 text-neutral-900 font-poppins pb-10">
@@ -78,7 +79,7 @@
                    font-bold
                    flex items-center justify-center"
           >
-            5
+            0
           </span>
 
         </button>
@@ -709,6 +710,121 @@
 
   </div>
 </div>
+
+<!-- Cart Modal -->
+<div
+  id="cart-modal"
+  class="fixed inset-0 z-[100] hidden bg-black/50 backdrop-blur-sm "
+>
+  <div
+   class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+       h-[70%] w-full max-w-[90%]
+       bg-white shadow-2xl flex flex-col rounded-xl"
+  >
+
+    <!-- Header -->
+    <div class="flex items-center justify-between p-5 border-b border-primary-700">
+      <div>
+        <h2 class="font-jakarta text-xl font-bold text-primary-800">
+          Your Orders
+        </h2>
+        <p class="text-sm text-neutral-500">
+          Review your items
+        </p>
+      </div>
+
+      <button
+        id="close-cart"
+        class="w-10 h-10 rounded-xl bg-neutral-100
+               hover:bg-neutral-200 text-3xl
+               flex items-center justify-center"
+      >
+        ×
+      </button>
+    </div>
+
+    <!--cart items -->
+    <div
+      id="cart-items"
+      class="flex-1 overflow-y-auto p-5 space-y-4"
+    >
+      <!--cart items will appear here -->
+    </div>
+
+    <!--empty Cart -->
+    <div
+      id="empty-cart"
+      class="hidden flex-1 items-center justify-center text-center p-8"
+    >
+      <div>
+        <div class="text-5xl mb-4">🛒</div>
+
+        <h3 class="font-bold text-lg text-neutral-800">
+          Your order is empty
+        </h3>
+
+        <p class="text-sm text-neutral-500 mt-1">
+          Add something delicious from the menu.
+        </p>
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div class="border-t border-primary-800 p-5 bg-neutral-50 rounded-xl">
+
+      <div class="flex justify-between mb-2">
+        <span class="text-neutral-500">
+          Items
+        </span>
+
+        <span id="cart-total-items" class="font-semibold">
+          0
+        </span>
+      </div>
+
+      <div class="flex justify-between mb-5">
+        <span class="font-semibold text-lg">
+          Total
+        </span>
+
+        <span
+          id="cart-total-price"
+          class="font-jakarta font-bold text-xl text-secondary-600"
+        >
+          ₱0
+        </span>
+      </div>
+<div class="flex items-center justify-center gap-5">
+       <button
+        id="cancel-button"
+        class="w-[40%] h-14 rounded-xl
+               bg-white
+               hover:bg-primary-900
+               active:scale-[0.98]
+               border border-neutral-300
+               text-black font-semibold
+               transition"
+      >
+       Cancel
+      </button>
+
+      <button
+        id="checkout-button"
+        class="w-[40%] h-14 rounded-xl
+               bg-primary-800
+               hover:bg-primary-900
+               active:scale-[0.98]
+               text-white font-semibold
+               transition"
+      >
+       Checkout
+      </button>
+    </div>
+    </div>
+
+  </div>
+</div>
 <script type="module" src="/src/main.js"></script>
+<script type="module" src="/src/interactivity/cart.js"></script>
 </body>
 </html>
