@@ -208,7 +208,7 @@ function renderCart() {
       </div>
 
 
-      <div class="font-bold text-secondary-600 min-w-[60px] text-right">
+      <div class="font-bold text-secondary-600 min-w-15 text-right">
 
         ₱${item.price * item.quantity}
 
