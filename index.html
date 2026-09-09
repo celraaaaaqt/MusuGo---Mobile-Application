@@ -233,7 +233,8 @@
                    font-semibold
                    text-sm
                    hover:border-primary-300
-                   transition"
+                   transition-all
+                   duration-300"
             data-category="meals"
           >
             Classic MusuGo Meals
@@ -250,8 +251,9 @@
                    font-semibold
                    text-sm
                    hover:border-primary-300
-                   transition"
-            data-category="snacks"
+                   transition-all
+                   duration-300"
+            data-category="spicy meals"
           >
             Spicy MusuGo
           </button>
@@ -286,11 +288,7 @@
 
         </div>
 
-
-        <!-- ===================================== -->
         <!-- PRODUCTS -->
-        <!-- ===================================== -->
-
         <section
           id="product-grid"
           class="grid grid-cols-2
@@ -299,9 +297,7 @@
                  gap-4"
         >
 
-
           <!-- PRODUCT 1 -->
-
           <article
             class="product-card
                    group
@@ -316,8 +312,7 @@
             data-name="Pork MusuGo"
           >
 
-            <!-- Image -->
-
+            <!-- images -->
             <div
               class="aspect-square
                      bg-gradient-to-br
@@ -327,7 +322,6 @@
                      flex items-center justify-center"
             >
 
-        
                 <img 
                 class ="w-full h-full object-cover"
                 src="src/assets/menu/menu1.jpg" alt="Pork MusuGo"/>
@@ -348,9 +342,7 @@
 
             </div>
 
-
             <!-- menu1 infos -->
-
             <div class="p-4">
 
               <h4
@@ -425,7 +417,7 @@
                    hover:shadow-lg
                    hover:-translate-y-1
                    transition"
-            data-category="meals"
+            data-category="spicy meals"
             data-name="Spicy Pork MusuGo"
           >
 
@@ -595,7 +587,7 @@
                    hover:shadow-lg
                    hover:-translate-y-1
                    transition"
-            data-category="meals"
+            data-category="spicy meals"
             data-name="Spicy Chicken MusuGo"
           >
 
@@ -826,5 +818,7 @@
 </div>
 <script type="module" src="/src/main.js"></script>
 <script type="module" src="/src/interactivity/cart.js"></script>
+<script type="module" src="/src/interactivity/product_category.js"></script>
+<script type="module" src="/src/interactivity/search_products"></script>
 </body>
 </html>

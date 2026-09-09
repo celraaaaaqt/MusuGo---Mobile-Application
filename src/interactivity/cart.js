@@ -54,16 +54,16 @@ cancelButton.addEventListener("click", () => {
 
     if (result.isConfirmed) {
 
-      // Clear cart
+      //clears the cart
       cart = [];
 
-      // Update cart badge
+      //update cart count
       updateCartCount();
 
-      // Update cart modal
+      //update the cart modal
       renderCart();
 
-      // Close modal
+      //close the modal
       cartModal.classList.add("hidden");
     }
 
@@ -72,7 +72,7 @@ cancelButton.addEventListener("click", () => {
 });
 
 
-//cart modal
+//automatically close when the user clicked any keys outside the modal
 cartModal.addEventListener("click", (event) => {
   if (event.target === cartModal) {
     cartModal.classList.add("hidden");
