@@ -31,6 +31,7 @@ cancelButton.addEventListener("click", () => {
     return;
   }
 
+  //confirmation modal for cancel and checkoout
   Swal.fire({
     title: "Cancel order?",
     text: "All items in your cart will be removed.",
@@ -80,10 +81,7 @@ cartModal.addEventListener("click", (event) => {
 });
 
 
-// ================================
-// ADD TO CART
-// ================================
-
+//add to cart (view orders)
 document.querySelectorAll(".add-cart").forEach((button) => {
 
   button.addEventListener("click", () => {
@@ -126,7 +124,6 @@ function updateCartCount() {
   cartCount.textContent = totalQuantity;
 
 }
-
 
 //cart data renderer
 function renderCart() {
