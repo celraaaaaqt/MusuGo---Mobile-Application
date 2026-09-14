@@ -1,0 +1,438 @@
+import { clearCart, getCart } from "./cart.js";
+
+const checkoutItems = document.querySelector("#checkout-items");
+const checkoutTotal = document.querySelector("#checkout-total");
+
+const checkoutModal = document.getElementById("checkout-modal");
+const checkoutButton = document.getElementById("checkout-button");
+const closeCheckout = document.getElementById("close-checkout");
+const backToCart = document.getElementById("back-to-cart");
+const cartModal = document.getElementById("cart-modal");
+
+//for payment method
+const cashPayment = document.getElementById("cash-payment");
+const gcashPayment = document.getElementById("gcash-payment");
+
+const cashSection = document.getElementById("cash-section");
+const gcashSection = document.getElementById("gcash-section");
+
+const cashReceived = document.getElementById("cash-received");
+const cashChange = document.getElementById("cash-change");
+
+const gcashTotal = document.getElementById("gcash-total");
+
+const placeOrder = document.getElementById("place-order");
+
+//order confirmations variables
+const orderSuccessModal = document.getElementById("order-success-modal");
+
+const successOrderNumber = document.getElementById("success-order-number");
+
+const doneOrder = document.getElementById("done-order");
+
+//open checkout
+checkoutButton.addEventListener("click", () => {
+
+  checkoutModal.classList.remove("hidden");
+  cartModal.classList.add("hidden");
+
+  renderCheckout();
+
+});
+
+
+
+//close checkout
+closeCheckout.addEventListener("click", () => {
+
+  checkoutModal.classList.add("hidden");
+
+});
+
+
+
+//back to cart
+backToCart.addEventListener("click", () => {
+
+  checkoutModal.classList.add("hidden");
+  cartModal.classList.remove("hidden");
+
+});
+
+
+
+//render the checkout
+function renderCheckout() {
+
+ const cart = getCart();
+
+  checkoutItems.innerHTML = "";
+
+  let total = 0;
+
+
+  
+  //if cart is empty
+  if (cart.length === 0) {
+
+    checkoutItems.innerHTML = `
+      <p class="text-center text-neutral-500 py-6">
+        Your cart is empty.
+      </p>
+    `;
+
+    checkoutTotal.textContent = "₱0";
+
+    return;
+  }
+
+  //display each items
+  cart.forEach((item) => {
+
+    const itemTotal =
+      item.price * item.quantity;
+
+    total += itemTotal;
+
+
+    const itemElement =
+      document.createElement("div");
+
+    itemElement.classList.add(
+      "flex",
+      "items-center",
+      "justify-between",
+      "py-3"
+    );
+
+
+    itemElement.innerHTML = `
+      <div>
+
+        <p class="font-semibold">
+          ${item.name}
+        </p>
+
+        <p class="text-sm text-gray-500">
+          ${item.quantity} × ₱${item.price.toFixed(2)}
+        </p>
+
+      </div>
+
+      <p class="font-semibold">
+        ₱${itemTotal.toFixed(2)}
+      </p>
+    `;
+
+
+    checkoutItems.appendChild(itemElement);
+
+  });
+
+  //display total
+  checkoutTotal.textContent =
+    `₱${total.toFixed(2)}`;
+
+}
+
+function selectCash() {
+  cashPayment.classList.add(
+    "bg-primary-800",
+    "text-white",
+    "border-primary-600"
+  );
+
+  cashPayment.classList.remove(
+    "bg-white",
+    "text-neutral-700",
+    "border-neutral-200"
+  );
+
+  gcashPayment.classList.add(
+    "bg-white",
+    "text-neutral-700",
+    "border-neutral-200"
+  );
+
+  gcashPayment.classList.remove(
+    "bg-primary-500",
+    "text-white",
+    "border-primary-500"
+  );
+}
+
+
+function selectGCash() {
+  gcashPayment.classList.add(
+    "bg-primary-800",
+    "text-white",
+    "border-primary-600"
+  );
+
+  gcashPayment.classList.remove(
+    "bg-white",
+    "text-neutral-700",
+    "border-neutral-200"
+  );
+
+  cashPayment.classList.add(
+    "bg-white",
+    "text-neutral-700",
+    "border-neutral-200"
+  );
+
+  cashPayment.classList.remove(
+    "bg-primary-500",
+    "text-white",
+    "border-primary-500"
+  );
+}
+
+
+//PAYMenT METHOD
+
+// Cash payment
+cashPayment.addEventListener("click", () => {
+
+      selectCash();
+
+  cashSection.classList.remove("hidden");
+  gcashSection.classList.add("hidden");
+
+  updatePaymentTotal();
+
+});
+
+// GCash payment
+gcashPayment.addEventListener("click", () => {
+selectGCash();
+  gcashSection.classList.remove("hidden");
+  cashSection.classList.add("hidden");
+
+  updatePaymentTotal();
+
+});
+
+
+// Calculate payment total
+function updatePaymentTotal() {
+
+  const cart =
+    JSON.parse(localStorage.getItem("cart")) || [];
+
+  let total = 0;
+
+  cart.forEach((item) => {
+    total += item.price * item.quantity;
+  });
+
+  gcashTotal.textContent =
+    `₱${total.toFixed(2)}`;
+
+}
+
+
+//calculate change
+cashReceived.addEventListener("input", () => {
+
+  const cart =
+    JSON.parse(localStorage.getItem("cart")) || [];
+
+  let total = 0;
+
+  cart.forEach((item) => {
+    total += item.price * item.quantity;
+  });
+
+  const received =
+    Number(cashReceived.value);
+
+  const change =
+    received - total;
+
+  if (received <= 0) {
+    cashChange.textContent = "₱0.00";
+    return;
+  }
+
+  if (change < 0) {
+    cashChange.textContent = "Insufficient cash";
+    return;
+  }
+
+  cashChange.textContent =
+    `₱${change.toFixed(2)}`;
+
+});
+
+
+placeOrder.addEventListener("click", () => {
+
+  const cart = getCart();
+
+  if (cart.length === 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "Cart is empty",
+      text: "Please add items before placing an order."
+    });
+
+    return;
+  }
+
+
+  // Calculate total
+  let total = 0;
+
+  cart.forEach((item) => {
+    total += item.price * item.quantity;
+  });
+
+
+  // Get payment method
+  let paymentMethod = "";
+
+  if (!cashSection.classList.contains("hidden")) {
+    paymentMethod = "Cash";
+
+    const received = Number(cashReceived.value);
+
+    if (received < total) {
+      Swal.fire({
+        icon: "error",
+        title: "Insufficient cash",
+        text: "Please enter enough cash to complete the order."
+      });
+
+      return;
+    }
+
+  } else if (!gcashSection.classList.contains("hidden")) {
+    paymentMethod = "GCash";
+
+  } else {
+
+    Swal.fire({
+      icon: "warning",
+      title: "Select a payment method",
+      text: "Please choose Cash or GCash before placing your order."
+    });
+
+    return;
+  }
+
+
+  // Build order summary
+  const orderSummary = cart.map((item) => {
+
+    const itemTotal =
+      item.price * item.quantity;
+
+    return `
+      <div class="flex justify-between items-center text-left py-2">
+        
+        <div>
+          <p class="font-semibold">
+            ${item.name}
+          </p>
+
+          <p class="text-sm text-gray-500">
+            ${item.quantity} × ₱${item.price.toFixed(2)}
+          </p>
+        </div>
+
+        <p class="font-semibold">
+          ₱${itemTotal.toFixed(2)}
+        </p>
+
+      </div>
+    `;
+
+  }).join("");
+
+
+  //confirmation
+  Swal.fire({
+    title: "Confirm your order?",
+    
+    html: `
+      <div class="mt-4">
+
+        <div class="divide-y divide-neutral-200">
+          ${orderSummary}
+        </div>
+
+        <div class="border-t border-neutral-300 mt-4 pt-4">
+
+          <div class="flex justify-between font-bold text-lg">
+            <span>Total</span>
+            <span>₱${total.toFixed(2)}</span>
+          </div>
+
+          <div class="flex justify-between text-sm text-gray-500 mt-2">
+            <span>Payment</span>
+            <span>${paymentMethod}</span>
+          </div>
+
+        </div>
+
+      </div>
+    `,
+
+    icon: "question",
+
+    showCancelButton: true,
+
+    confirmButtonText: "Confirm Order",
+    cancelButtonText: "Go Back",
+
+    reverseButtons: true,
+
+    customClass: {
+      actions: "swal-actions",
+      confirmButton: "swal-confirm",
+      cancelButton: "swal-cancel"
+    },
+
+    buttonsStyling: false
+
+  }).then((result) => {
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+
+    //generate a temporary number
+    const orderNumber =
+      Math.floor(100000 + Math.random() * 900000);
+
+
+    //clearcart
+    clearCart();
+
+
+    //show success modal
+    successOrderNumber.textContent =
+      `#${orderNumber}`;
+
+    checkoutModal.classList.add("hidden");
+
+    orderSuccessModal.classList.remove("hidden");
+    orderSuccessModal.classList.add("flex");
+
+
+    //reset cash fields
+    cashReceived.value = "";
+    cashChange.textContent = "₱0.00";
+
+  });
+
+});
+
+doneOrder.addEventListener("click", () => {
+
+  orderSuccessModal.classList.add("hidden");
+  orderSuccessModal.classList.remove("flex");
+
+});

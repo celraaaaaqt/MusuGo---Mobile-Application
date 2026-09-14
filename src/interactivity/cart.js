@@ -1,4 +1,4 @@
-let cart = [];
+let cart = JSON.parse(localStorage.getItem("cart")) || [];
 
 const cartButton = document.getElementById("cart-button"); //button to enter the modal
 const cartModal = document.getElementById("cart-modal"); //main div
@@ -11,7 +11,6 @@ const emptyCart = document.getElementById("empty-cart"); //thiss will display if
 const cartCount = document.getElementById("cart-count"); // the display number per order
 const cartTotalItems = document.getElementById("cart-total-items"); //modal total items countings
 const cartTotalPrice = document.getElementById("cart-total-price"); //modal total price countings
-
 
 //if customer clicked the view orders, the modal will show
 cartButton.addEventListener("click", () => {
@@ -57,7 +56,7 @@ cancelButton.addEventListener("click", () => {
 
       //clears the cart
       cart = [];
-
+saveCart();
       //update cart count
       updateCartCount();
 
@@ -106,7 +105,7 @@ document.querySelectorAll(".add-cart").forEach((button) => {
       });
 
     }
-
+saveCart();
     updateCartCount();
 
   });
@@ -222,17 +221,14 @@ function renderCart() {
   });
 
 
-  // Update totals
+  //uppdate totals
 
   cartTotalItems.textContent = totalItems;
 
   cartTotalPrice.textContent =
     `₱${totalPrice}`;
 
-
-  // ================================
-  // DECREASE ITEM
-  // ================================
+  //decrease items
 
   document.querySelectorAll(".decrease-item").forEach((button) => {
 
@@ -245,7 +241,7 @@ function renderCart() {
       if (cart[index].quantity <= 0) {
         cart.splice(index, 1);
       }
-
+saveCart();
       updateCartCount();
       renderCart();
 
@@ -261,7 +257,7 @@ function renderCart() {
       const index = Number(button.dataset.index);
 
       cart[index].quantity++;
-
+saveCart();
       updateCartCount();
       renderCart();
 
@@ -270,3 +266,20 @@ function renderCart() {
   });
 
 }
+
+function saveCart() {
+  localStorage.setItem("cart", JSON.stringify(cart));
+}
+
+//for clearing all localItem in cart here
+export function clearCart() {
+  cart = [];
+  localStorage.removeItem("cart");
+  updateCartCount();
+  renderCart();
+}
+
+export function getCart() {
+  return cart;
+}
+updateCartCount();

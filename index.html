@@ -23,6 +23,11 @@
   href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
   rel="stylesheet"
 />
+
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+/>
   <title>Musu Go</title>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -51,18 +56,18 @@
         <!-- cart -->
         <button
           id="cart-button"
-          class="relative w-20 h-12
+          class="relative w-15 h-12
           mt-3
                  rounded-xl
                  px-5
-                 text-xs
+                 text-lg
                  font-medium
                  bg-primary-700
                  hover:bg-primary-600
                  active:scale-95
                  transition
                  flex items-center justify-center"
-        > View Orders
+        ><i class="fa fa-shopping-cart"></i>
 
           <!-- cart icon -->
 
@@ -815,9 +820,439 @@
 
   </div>
 </div>
+
+
+
+<!-- Checkout Modal -->
+<div
+  id="checkout-modal"
+  class="fixed inset-0 z-[110] hidden bg-black/50 backdrop-blur-sm"
+>
+  <div
+    class="absolute top-1/2 left-1/2
+           -translate-x-1/2 -translate-y-1/2
+           w-[90%] max-w-2xl
+           max-h-[90vh]
+           bg-white
+           rounded-2xl
+           shadow-2xl
+           flex flex-col
+           overflow-hidden"
+  >
+
+    <!-- Header -->
+    <div
+      class="flex items-center justify-between
+             p-5 border-b border-primary-100"
+    >
+      <div>
+        <h2
+          class="font-jakarta text-xl font-bold text-primary-800"
+        >
+          Checkout
+        </h2>
+
+        <p class="text-sm text-neutral-500">
+          Complete your order
+        </p>
+      </div>
+
+      <button
+        id="close-checkout"
+        class="w-10 h-10
+               rounded-xl
+               bg-neutral-100
+               hover:bg-neutral-200
+               text-3xl
+               flex items-center justify-center
+               transition"
+      >
+        ×
+      </button>
+    </div>
+
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-6">
+
+      <!-- ORDER SUMMARY -->
+      <section>
+
+        <h3
+          class="font-jakarta
+                 font-bold
+                 text-lg
+                 text-primary-800
+                 mb-3"
+        >
+          Order Summary
+        </h3>
+
+        <div
+          id="checkout-items"
+          class="space-y-3"
+        >
+          <!-- Items will be inserted by JS -->
+        </div>
+
+      </section>
+
+
+      <!-- TOTAL -->
+      <div
+        class="rounded-2xl
+               bg-primary-50
+               p-4"
+      >
+
+        <div class="flex justify-between items-center">
+
+          <span
+            class="font-semibold
+                   text-neutral-600"
+          >
+            Total
+          </span>
+
+          <span
+            id="checkout-total"
+            class="font-jakarta
+                   font-bold
+                   text-2xl
+                   text-secondary-600"
+          >
+            ₱0
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <!-- PAYMENT METHOD -->
+      <section>
+
+        <h3
+          class="font-jakarta
+                 font-bold
+                 text-lg
+                 text-primary-800
+                 mb-3"
+        >
+          Payment Method
+        </h3>
+
+
+        <div class="grid grid-cols-2 gap-3">
+
+          <!-- CASH -->
+          <button
+            id="cash-payment"
+            class="payment-method
+                   h-16
+                   rounded-xl
+                   border-2
+                   border-primary-600
+                   text-primary-800
+                   font-semibold
+                   transition
+                   active:scale-[0.98]"
+          >
+            Cash
+          </button>
+
+
+          <!-- GCASH -->
+          <button
+            id="gcash-payment"
+              class="payment-method
+                   h-16
+                   rounded-xl
+                   border-2
+                   border-primary-600
+                   text-primary-800
+                   font-semibold
+                   transition
+                   active:scale-[0.98]"
+          >
+            GCash
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <!-- CASH PAYMENT -->
+      <section id="cash-section">
+
+        <label
+          for="cash-received"
+          class="block
+                 font-semibold
+                 text-neutral-700
+                 mb-2"
+        >
+          Amount to Pay
+        </label>
+
+        <div class="relative">
+
+          <span
+            class="absolute
+                   left-4
+                   top-1/2
+                   -translate-y-1/2
+                   text-neutral-500
+                   font-semibold"
+          >
+            ₱
+          </span>
+
+          <input
+            id="cash-received"
+            type="number"
+            min="0"
+            placeholder="Enter amount"
+            class="w-full
+                   h-14
+                   pl-10
+                   pr-4
+                   rounded-xl
+                   border
+                   border-neutral-200
+                   outline-none
+                   focus:border-primary-500
+                   focus:ring-2
+                   focus:ring-primary-100
+                   text-lg
+                   font-semibold"
+          />
+
+        </div>
+
+
+        <!-- CHANGE -->
+        <div
+          class="flex
+                 justify-between
+                 items-center
+                 mt-3
+                 p-4
+                 rounded-xl
+                 bg-neutral-50"
+        >
+
+          <span class="text-neutral-500">
+            Change
+          </span>
+
+          <span
+            id="cash-change"
+            class="font-jakarta
+                   font-bold
+                   text-lg
+                   text-secondary-600"
+          >
+            ₱0
+          </span>
+
+        </div>
+
+      </section>
+
+
+      <!-- GCASH PAYMENT -->
+      <section
+        id="gcash-section"
+        class="hidden"
+      >
+
+        <div
+          class="rounded-2xl
+                 border
+                 border-neutral-200
+                 p-6
+                 text-center"
+        >
+
+          <h3
+            class="font-jakarta
+                   font-bold
+                   text-lg
+                   text-primary-800"
+          >
+            Scan to Pay
+          </h3>
+
+          <p
+            class="text-sm
+                   text-neutral-500
+                   mt-1
+                   mb-5"
+          >
+            Scan the QR code using GCash
+          </p>
+
+
+          <!-- QR PLACEHOLDER -->
+          <div
+            class="w-48 h-48
+                   mx-auto
+                   rounded-xl
+                   bg-neutral-100
+                   border
+                   border-neutral-200
+                   flex
+                   items-center
+                   justify-center"
+          >
+
+            <span
+              class="text-neutral-400
+                     text-sm
+                     font-medium"
+            >
+              QR Code
+            </span>
+
+          </div>
+
+
+          <p
+            class="text-sm
+                   text-neutral-500
+                   mt-4"
+          >
+            Total to pay
+          </p>
+
+          <p
+            id="gcash-total"
+            class="font-jakarta
+                   font-bold
+                   text-xl
+                   text-secondary-600
+                   mt-1"
+          >
+            ₱0
+          </p>
+
+        </div>
+
+      </section>
+
+    </div>
+
+
+    <!-- FOOTER -->
+    <div
+      class="border-t
+             border-primary-100
+             p-5
+             bg-neutral-50"
+    >
+
+      <div class="flex gap-3">
+
+        <!-- BACK -->
+        <button
+          id="back-to-cart"
+          class="flex-1
+                 h-14
+                 rounded-xl
+                 bg-white
+                 border
+                 border-neutral-300
+                 text-black
+                 font-semibold
+                 hover:bg-neutral-100
+                 active:scale-[0.98]
+                 transition"
+        >
+          Back
+        </button>
+
+
+        <!-- PLACE ORDER -->
+        <button
+          id="place-order"
+          class="flex-1
+                 h-14
+                 rounded-xl
+                 bg-primary-800
+                 hover:bg-primary-900
+                 text-white
+                 font-semibold
+                 active:scale-[0.98]
+                 transition"
+        >
+          Place Order
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<!--order confirmation-->
+<div
+  id="order-success-modal"
+  class="fixed inset-0 z-[120] hidden bg-black/50 backdrop-blur-sm
+         items-center justify-center p-4"
+>
+  <div
+    class="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-xl"
+  >
+
+    <div
+      class="mx-auto mb-5 flex h-16 w-16 items-center justify-center
+             rounded-full bg-primary-100 text-primary-600 text-3xl"
+    >
+      ✓
+    </div>
+
+    <h2 class="text-2xl font-bold text-primary-800">
+      Order Placed!
+    </h2>
+
+    <p class="mt-2 text-neutral-500">
+      Your order has been successfully placed.
+    </p>
+
+    <div
+      class="mt-6 rounded-2xl bg-neutral-50 p-5"
+    >
+      <p class="text-sm text-neutral-500">
+        Order Number
+      </p>
+
+      <p
+        id="success-order-number"
+        class="mt-1 text-3xl font-bold text-primary-700"
+      >
+        #000000
+      </p>
+    </div>
+
+    <button
+      id="done-order"
+      class="mt-6 w-full rounded-xl bg-primary-500
+             px-5 py-3 font-semibold text-white
+             hover:bg-primary-600 transition"
+    >
+      Done
+    </button>
+
+  </div>
+</div>
 <script type="module" src="/src/main.js"></script>
 <script type="module" src="/src/interactivity/cart.js"></script>
 <script type="module" src="/src/interactivity/product_category.js"></script>
-<script type="module" src="/src/interactivity/search_products"></script>
+<script type="module" src="/src/interactivity/search_products.js"></script>
+<script type="module" src="/src/interactivity/checkout.js"></script>
 </body>
 </html>
