@@ -46,7 +46,7 @@ cancelButton.addEventListener("click", () => {
     customClass: {
       actions: "swal-actions",
       confirmButton: "swal-confirm",
-      cancelButton: "swal-cancel"
+      cancelButton: "swal-cancel" 
     },
 
     buttonsStyling: false
@@ -81,35 +81,24 @@ cartModal.addEventListener("click", (event) => {
 
 
 //add to cart (view orders)
-document.querySelectorAll(".add-cart").forEach((button) => {
+document.addEventListener("click", (event) => {
+  const button = event.target.closest(".add-cart");
+  if (!button) return;
 
-  button.addEventListener("click", () => {
+  const id = button.dataset.id;
+  const name = button.dataset.name;
+  const price = Number(button.dataset.price);
 
-    const name = button.dataset.name;
-    const price = Number(button.dataset.price);
+  const existingItem = cart.find((item) => item.id === id);
 
-    const existingItem = cart.find(
-      (item) => item.name === name
-    );
+  if (existingItem) {
+    existingItem.quantity++;
+  } else {
+    cart.push({ id: id, name: name, price: price, quantity: 1 });
+  }
 
-    if (existingItem) {
-
-      existingItem.quantity++;
-
-    } else {
-
-      cart.push({
-        name: name,
-        price: price,
-        quantity: 1
-      });
-
-    }
-saveCart();
-    updateCartCount();
-
-  });
-
+  saveCart();
+  updateCartCount();
 });
 
 //for updaating cart count

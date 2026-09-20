@@ -1,4 +1,6 @@
+import { pb } from '../lib/pb.js';
 import { clearCart, getCart } from "./cart.js";
+
 
 const checkoutItems = document.querySelector("#checkout-items");
 const checkoutTotal = document.querySelector("#checkout-total");
@@ -71,7 +73,6 @@ function renderCheckout() {
   let total = 0;
 
 
-  
   //if cart is empty
   if (cart.length === 0) {
 
@@ -396,35 +397,64 @@ placeOrder.addEventListener("click", () => {
 
     buttonsStyling: false
 
-  }).then((result) => {
+  }).then(async (result) => {
 
     if (!result.isConfirmed) {
       return;
     }
 
+    try {
+  // Step A: create one cart_items record per product line + deduct stock
+  const cartItemIds = [];
+  for (const item of cart) {
+    const cartItem = await pb.collection('cart_items').create({
+      product: item.id,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.price * item.quantity,
+    });
+    cartItemIds.push(cartItem.id);
 
-    //generate a temporary number
-    const orderNumber =
-      Math.floor(100000 + Math.random() * 900000);
+    // deduct stock
+    const product = await pb.collection('products').getOne(item.id);
+    await pb.collection('products').update(item.id, {
+      stocks: Math.max(0, product.stocks - item.quantity),
+    });
+  }
 
+  // Step B: create the order
+  const order = await pb.collection('orders').create({
+    cart_items: cartItemIds,
+    total: total,
+    payment_status: paymentMethod === "Cash" ? "Pending" : "Paid",
+  });
 
-    //clearcart
-    clearCart();
+  // Step C: create the payment record
+await pb.collection('payment').create({
+  order: order.id,
+  amount: total,
+  payment_method: paymentMethod, // "Cash" or "GCash"
+  status: paymentMethod === "Cash" ? "Pending" : "Complete",
+});
 
+  clearCart();
 
-    //show success modal
-    successOrderNumber.textContent =
-      `#${orderNumber}`;
+  successOrderNumber.textContent = `#${order.id.slice(-6).toUpperCase()}`;
+  checkoutModal.classList.add("hidden");
+  orderSuccessModal.classList.remove("hidden");
+  orderSuccessModal.classList.add("flex");
 
-    checkoutModal.classList.add("hidden");
+  cashReceived.value = "";
+  cashChange.textContent = "₱0.00";
 
-    orderSuccessModal.classList.remove("hidden");
-    orderSuccessModal.classList.add("flex");
-
-
-    //reset cash fields
-    cashReceived.value = "";
-    cashChange.textContent = "₱0.00";
+} catch (err) {
+  console.error('Order failed:', err);
+  Swal.fire({
+    icon: "error",
+    title: "Order failed",
+    text: "Something went wrong while placing your order. Please try again."
+  });
+}
 
   });
 

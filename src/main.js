@@ -1,3 +1,5 @@
 import "./styles.css";
 
-const { invoke } = window.__TAURI__.core;
+if (window.__TAURI__) {
+  const { invoke } = window.__TAURI__.core;
+}
