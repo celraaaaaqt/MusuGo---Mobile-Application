@@ -403,7 +403,7 @@ placeOrder.addEventListener("click", () => {
       return;
     }
 
-    try {
+        try {
   // Step A: create one cart_items record per product line + deduct stock
   const cartItemIds = [];
   for (const item of cart) {
@@ -422,24 +422,30 @@ placeOrder.addEventListener("click", () => {
     });
   }
 
+  // Step A.5: generate order number
+  // Step A.5: generate order number (based on today's date + time, no List permission needed)
+const now = new Date();
+const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+
   // Step B: create the order
   const order = await pb.collection('orders').create({
+    order_number: orderNumber,
     cart_items: cartItemIds,
     total: total,
     payment_status: paymentMethod === "Cash" ? "Pending" : "Paid",
   });
 
   // Step C: create the payment record
-await pb.collection('payment').create({
-  order: order.id,
-  amount: total,
-  payment_method: paymentMethod, // "Cash" or "GCash"
-  status: paymentMethod === "Cash" ? "Pending" : "Complete",
-});
+  await pb.collection('payment').create({
+    order: order.id,
+    amount: total,
+    payment_method: paymentMethod,
+    status: paymentMethod === "Cash" ? "Pending" : "Complete",
+  });
 
   clearCart();
 
-  successOrderNumber.textContent = `#${order.id.slice(-6).toUpperCase()}`;
+  successOrderNumber.textContent = `#${order.order_number}`;
   checkoutModal.classList.add("hidden");
   orderSuccessModal.classList.remove("hidden");
   orderSuccessModal.classList.add("flex");
