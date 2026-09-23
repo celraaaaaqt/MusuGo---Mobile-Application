@@ -8,11 +8,11 @@
       const products = await pb.collection('products').getFullList({
         sort: 'product_name',
         filter: 'is_active = true',
-        expand: 'product_category', //pulls in the related category record
+        expand: 'product_category', //pulls in the related category record 
       });
       console.log(products);
       renderProducts(products);
-      attachCategoryFilter();
+      attachCategoryFilter(); 
     } catch (err) {
       console.error('Failed to load products:', err);
     }
