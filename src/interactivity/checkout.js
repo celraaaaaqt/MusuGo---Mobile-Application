@@ -30,6 +30,8 @@ const orderSuccessModal = document.getElementById("order-success-modal");
 
 const successOrderNumber = document.getElementById("success-order-number");
 
+//order processing loaing or inicatorr
+const processingModal = document.getElementById("processing-modal");
 const doneOrder = document.getElementById("done-order");
 
 //open checkout
@@ -86,6 +88,17 @@ function renderCheckout() {
 
     return;
   }
+  const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+if (totalQuantity > 10) {
+  Swal.fire({
+    icon: "warning",
+    title: "Order limit exceeded",
+    text: "You can order up to 10 items per order. Please adjust your cart."
+  });
+
+  return;
+}
 
   //display each items
   cart.forEach((item) => {
@@ -204,7 +217,7 @@ cashPayment.addEventListener("click", () => {
 
 });
 
-// GCash payment
+//gCash payment
 gcashPayment.addEventListener("click", () => {
 selectGCash();
   gcashSection.classList.remove("hidden");
@@ -215,7 +228,7 @@ selectGCash();
 });
 
 
-// Calculate payment total
+//calculate payment total
 function updatePaymentTotal() {
 
   const cart =
@@ -399,9 +412,15 @@ placeOrder.addEventListener("click", () => {
 
   }).then(async (result) => {
 
-    if (!result.isConfirmed) {
+   if (!result.isConfirmed) {
       return;
     }
+
+    //show a loading state right away — the PocketBase calls below can take
+    //a moment, and the customer shouldn't just be staring at nothing
+    checkoutModal.classList.add("hidden");
+    processingModal.classList.remove("hidden");
+    processingModal.classList.add("flex");
 
         try {
   // Step A: create one cart_items record per product line + deduct stock
@@ -445,6 +464,9 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
 
   clearCart();
 
+  processingModal.classList.add("hidden");
+  processingModal.classList.remove("flex");
+
   successOrderNumber.textContent = `#${order.order_number}`;
   checkoutModal.classList.add("hidden");
   orderSuccessModal.classList.remove("hidden");
@@ -455,6 +477,11 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
 
 } catch (err) {
   console.error('Order failed:', err);
+
+  processingModal.classList.add("hidden");
+  processingModal.classList.remove("flex");
+  checkoutModal.classList.remove("hidden");
+
   Swal.fire({
     icon: "error",
     title: "Order failed",

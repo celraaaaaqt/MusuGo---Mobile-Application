@@ -1,0 +1,240 @@
+import express from "express";
+import cors from "cors";
+import crypto from "crypto";
+import PocketBase from "pocketbase";
+
+const app = express();
+app.use(cors());
+
+const {
+  PAYMONGO_SECRET_KEY,
+  PAYMONGO_WEBHOOK_SECRET,
+  POCKETBASE_URL,
+  PB_SUPERUSER_EMAIL,
+  PB_SUPERUSER_PASSWORD,
+} = process.env;
+
+// PayMongo needs "Basic base64(secret_key:)" auth
+const paymongoAuth =
+  "Basic " + Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString("base64");
+
+// PayMongo signs webhooks differently per mode (test vs live) — figure out
+// which one we're in from the secret key prefix so we compare against the
+// right half of the Paymongo-Signature header.
+const PAYMONGO_MODE = PAYMONGO_SECRET_KEY?.startsWith("sk_live_")
+  ? "live"
+  : "test";
+
+async function paymongoRequest(path, body) {
+  const response = await fetch(`https://api.paymongo.com/v1/${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: paymongoAuth,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  return { ok: response.ok, status: response.status, data };
+}
+
+// 1) Frontend calls this right after the order/payment records are
+//    created with status "Pending" — creates a PayMongo Payment Intent
+//    and hands back the client_key the frontend needs next.
+app.post("/api/create-intent", express.json(), async (req, res) => {
+  const { amount, orderId, orderNumber } = req.body;
+
+  try {
+    const response = await fetch("https://api.paymongo.com/v1/payment_intents", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: paymongoAuth,
+      },
+      body: JSON.stringify({
+        data: {
+          attributes: {
+            amount: Math.round(amount * 100), // PayMongo uses centavos
+            currency: "PHP",
+            payment_method_allowed: ["qrph"],
+            description: `Order #${orderNumber}`,
+            metadata: { order_id: orderId }, // lets the webhook find the order later
+          },
+        },
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json(data);
+
+    res.json({
+      paymentIntentId: data.data.id,
+      clientKey: data.data.attributes.client_key,
+    });
+  } catch (err) {
+    console.error("create-intent failed:", err);
+    res.status(500).json({ error: "Failed to create payment intent" });
+  }
+});
+
+// 1b) QR Ph (GCash scan-to-pay) in one call: create the Payment Intent,
+//     create a qrph Payment Method, and attach them — all server-side,
+//     since qrph billing details (name/email/phone) aren't sensitive
+//     card data and don't need to touch the client's public key.
+//     Returns the base64 QR image the frontend renders directly.
+app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
+  const {
+    amount,
+    orderId,
+    orderNumber,
+    billingName,
+    billingEmail,
+    billingPhone,
+  } = req.body;
+
+  if (!amount || !orderId) {
+    return res.status(400).json({ error: "amount and orderId are required" });
+  }
+
+  try {
+    // Step 1: create the Payment Intent
+    const intent = await paymongoRequest("payment_intents", {
+      data: {
+        attributes: {
+          amount: Math.round(amount * 100),
+          currency: "PHP",
+          payment_method_allowed: ["qrph"],
+          description: `Order #${orderNumber}`,
+          metadata: { order_id: orderId },
+        },
+      },
+    });
+    if (!intent.ok) return res.status(intent.status).json(intent.data);
+    const intentId = intent.data.data.id;
+
+    // Step 2: create the qrph Payment Method
+    const method = await paymongoRequest("payment_methods", {
+      data: {
+        attributes: {
+          type: "qrph",
+          billing: {
+            name: billingName || "Customer",
+            ...(billingEmail ? { email: billingEmail } : {}),
+            ...(billingPhone ? { phone: billingPhone } : {}),
+          },
+        },
+      },
+    });
+    if (!method.ok) return res.status(method.status).json(method.data);
+    const methodId = method.data.data.id;
+
+    // Step 3: attach — this is what actually generates the QR code
+    const attach = await paymongoRequest(
+      `payment_intents/${intentId}/attach`,
+      { data: { attributes: { payment_method: methodId } } }
+    );
+    if (!attach.ok) return res.status(attach.status).json(attach.data);
+
+    const code = attach.data.data.attributes.next_action?.code;
+    if (!code?.image_url) {
+      console.error("No QR code in attach response:", attach.data);
+      return res.status(502).json({ error: "PayMongo did not return a QR code" });
+    }
+
+    res.json({
+      paymentIntentId: intentId,
+      qrImageUrl: code.image_url, // already a data:image/... base64 string
+      // PayMongo typically expires QR Ph codes ~5 minutes after creation;
+      // expires_at (if present) is a unix seconds timestamp
+      expiresAt: code.expires_at ? code.expires_at * 1000 : Date.now() + 5 * 60 * 1000,
+    });
+  } catch (err) {
+    console.error("create-qrph-intent failed:", err);
+    res.status(500).json({ error: "Failed to create QR Ph payment" });
+  }
+});
+
+// Verifies the Paymongo-Signature header (HMAC-SHA256 over "timestamp.rawBody")
+// against the te (test mode) or li (live mode) half, per PayMongo's docs:
+// https://developers.paymongo.com/docs/securing-webhook
+function verifyPaymongoSignature(rawBody, signatureHeader) {
+  if (!signatureHeader || !PAYMONGO_WEBHOOK_SECRET) return false;
+
+  const parts = Object.fromEntries(
+    signatureHeader.split(",").map((pair) => {
+      const [key, value] = pair.split("=");
+      return [key, value];
+    })
+  );
+
+  const { t, te, li } = parts;
+  const candidate = PAYMONGO_MODE === "live" ? li : te;
+  if (!t || !candidate) return false;
+
+  // reject stale/replayed webhook calls (more than 5 minutes old)
+  const age = Math.abs(Date.now() / 1000 - Number(t));
+  if (!Number.isFinite(age) || age > 300) return false;
+
+  const expected = crypto
+    .createHmac("sha256", PAYMONGO_WEBHOOK_SECRET)
+    .update(`${t}.${rawBody}`)
+    .digest("hex");
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(candidate));
+  } catch {
+    // length mismatch etc. — treat as not verified
+    return false;
+  }
+}
+
+// 2) PayMongo calls this when the customer actually pays.
+//    Needs the raw body to verify the signature, so no express.json() here.
+app.post(
+  "/api/paymongo-webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signatureHeader = req.headers["paymongo-signature"];
+    const rawBody = req.body.toString();
+
+    if (!verifyPaymongoSignature(rawBody, signatureHeader)) {
+      console.warn("Rejected webhook: invalid or missing signature");
+      return res.sendStatus(401);
+    }
+
+    const event = JSON.parse(rawBody);
+    const eventType = event?.data?.attributes?.type;
+
+    if (eventType === "payment.paid") {
+      const intent = event.data.attributes.data;
+      const orderId = intent.attributes.metadata?.order_id;
+
+      if (orderId) {
+        try {
+          const pb = new PocketBase(POCKETBASE_URL);
+          await pb.collection("_superusers").authWithPassword(
+            PB_SUPERUSER_EMAIL,
+            PB_SUPERUSER_PASSWORD
+          );
+
+          await pb.collection("orders").update(orderId, {
+            payment_status: "Paid",
+          });
+
+          const paymentRecord = await pb
+            .collection("payment")
+            .getFirstListItem(`order="${orderId}"`);
+          await pb.collection("payment").update(paymentRecord.id, {
+            status: "Complete",
+          });
+        } catch (err) {
+          console.error("Failed to update PocketBase after payment:", err);
+        }
+      }
+    }
+
+    res.sendStatus(200); // acknowledge receipt regardless, per PayMongo's retry rules
+  }
+);
+
+app.listen(process.env.PORT || 3000, () => console.log("Payment server running"));

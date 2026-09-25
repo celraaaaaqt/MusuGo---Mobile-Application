@@ -187,12 +187,12 @@
             id="search-input"
             type="search"
             placeholder="Search menu..."
-            class="w-full h-14
+            class="w-full h-10
                    pl-12 pr-4
                    rounded-2xl
                    bg-white
                    border border-neutral-200
-                   text-base
+                   text-sm
                    outline-none
                    focus:border-primary-600
                    focus:ring-2
@@ -353,7 +353,7 @@
                        text-base
                        text-primary-800"
               >
-                Pork MusuGo
+                Pork MusuG
               </h4>
 
               <p
@@ -950,8 +950,9 @@
                    h-16
                    rounded-xl
                    border-2
+                   bg-primary-800
                    border-primary-600
-                   text-primary-800
+                   text-white
                    font-semibold
                    transition
                    active:scale-[0.98]"
@@ -1195,6 +1196,30 @@
   </div>
 </div>
 
+<!--order processing (shown while the order is being submitted)-->
+<div
+  id="processing-modal"
+  class="fixed inset-0 z-[130] hidden bg-black/50 backdrop-blur-sm
+         items-center justify-center p-4"
+>
+  <div
+    class="w-full max-w-xs rounded-3xl bg-white p-8 text-center shadow-xl"
+  >
+    <div
+      class="mx-auto mb-5 w-16 h-16 rounded-full
+             border-4 border-primary-100 border-t-primary-600
+             animate-spin"
+    ></div>
+
+    <h2 class="text-lg font-bold text-primary-800">
+      Processing your order
+    </h2>
+
+    <p class="mt-2 text-sm text-neutral-500">
+      Please wait a moment...
+    </p>
+  </div>
+</div>
 
 <!--order confirmation-->
 <div
@@ -1234,6 +1259,9 @@
       >
         #000000
       </p>
+
+      <p class="text-sm font-manrope text-neutral-400 mt-5">**Please take a screenshot of your order number for reference. Thank you!**
+ </p>
     </div>
 
     <button
@@ -1247,6 +1275,10 @@
 
   </div>
 </div>
+<div
+  id="toast-container"
+  class="fixed top-6 inset-x-0 z-[200] flex flex-col items-center gap-3 px-4 pointer-events-none"
+></div>
 <script type="module" src="/src/main.js"></script>
 <script type="module" src="/src/interactivity/cart.js"></script>
 <script type="module" src="/src/interactivity/product_category.js"></script>

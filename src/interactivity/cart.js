@@ -1,4 +1,9 @@
 let cart = JSON.parse(localStorage.getItem("cart")) || [];
+const MAX_ITEMS_PER_ORDER = 10; //order items limit
+
+function getTotalQuantity() {
+  return cart.reduce((total, item) => total + item.quantity, 0);
+}
 
 const cartButton = document.getElementById("cart-button"); //button to enter the modal
 const cartModal = document.getElementById("cart-modal"); //main div
@@ -89,6 +94,19 @@ document.addEventListener("click", (event) => {
   const name = button.dataset.name;
   const price = Number(button.dataset.price);
 
+  //these products aren't backed by a real PocketBase record (e.g. the
+  //static fallback cards shown if the menu failed to load) — checkout
+  //would break trying to look them up, so block it here instead
+  if (!id) {
+    showErrorToast("Menu is still loading — please try again in a moment.");
+    return;
+  }
+
+  if (getTotalQuantity() >= MAX_ITEMS_PER_ORDER) {
+  showErrorToast(`Limit of ${MAX_ITEMS_PER_ORDER} items per order`);
+  return;
+}
+
   const existingItem = cart.find((item) => item.id === id);
 
   if (existingItem) {
@@ -99,7 +117,78 @@ document.addEventListener("click", (event) => {
 
   saveCart();
   updateCartCount();
+  showAddedToast(name);
 });
+
+const toastContainer = document.getElementById("toast-container");
+
+//lightweight, non-blocking "added to cart" pill —
+//pointer-events-none end to end so it never blocks taps on the menu
+//behind it, and it never dims or blurs the page
+function showAddedToast(name) {
+  const toast = document.createElement("div");
+
+  toast.className =
+    "pointer-events-none inline-flex items-center gap-3 " +
+    "bg-neutral-900/90 backdrop-blur-md text-white " +
+    "rounded-full pl-2 pr-5 py-2 " +
+    "shadow-xl shadow-black/20 " +
+    "opacity-0 -translate-y-4 scale-95 " +
+    "transition-all duration-300 ease-out";
+
+  toast.innerHTML = `
+    <span class="w-7 h-7 shrink-0 rounded-full bg-primary-500 flex items-center justify-center text-xs">
+      <i class="fa fa-check"></i>
+    </span>
+    <span class="text-sm font-semibold whitespace-nowrap">
+      ${name} added
+    </span>
+  `;
+
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove("opacity-0", "-translate-y-4", "scale-95");
+  });
+
+  setTimeout(() => {
+    toast.classList.add("opacity-0", "-translate-y-2", "scale-95");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+  }, 1200);
+}
+
+//same pill style, red variant — used when an add-to-cart click can't be honored
+function showErrorToast(message) {
+  const toast = document.createElement("div");
+
+  toast.className =
+    "pointer-events-none inline-flex items-center gap-3 " +
+    "bg-red-600/95 backdrop-blur-md text-white " +
+    "rounded-full pl-2 pr-5 py-2 " +
+    "shadow-xl shadow-black/20 " +
+    "opacity-0 -translate-y-4 scale-95 " +
+    "transition-all duration-300 ease-out";
+
+  toast.innerHTML = `
+    <span class="w-7 h-7 shrink-0 rounded-full bg-white/20 flex items-center justify-center text-xs">
+      <i class="fa fa-exclamation"></i>
+    </span>
+    <span class="text-sm font-semibold whitespace-nowrap">
+      ${message}
+    </span>
+  `;
+
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove("opacity-0", "-translate-y-4", "scale-95");
+  });
+
+  setTimeout(() => {
+    toast.classList.add("opacity-0", "-translate-y-2", "scale-95");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+  }, 2000);
+}
 
 //for updaating cart count
 function updateCartCount() {
@@ -222,7 +311,7 @@ function renderCart() {
   document.querySelectorAll(".decrease-item").forEach((button) => {
 
     button.addEventListener("click", () => {
-
+      
       const index = Number(button.dataset.index);
 
       cart[index].quantity--;
@@ -242,7 +331,10 @@ saveCart();
   document.querySelectorAll(".increase-item").forEach((button) => {
 
     button.addEventListener("click", () => {
-
+      if (getTotalQuantity() >= MAX_ITEMS_PER_ORDER) {
+  showErrorToast(`Limit of ${MAX_ITEMS_PER_ORDER} items per order`);
+  return;
+}
       const index = Number(button.dataset.index);
 
       cart[index].quantity++;
