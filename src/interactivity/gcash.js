@@ -113,15 +113,28 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
   qrCountdownInterval = setInterval(tick, 1000);
 
   pb.collection('orders').subscribe(order.id, (e) => {
-    if (e.record.payment_status === "Paid") {
+  if (e.record.payment_status === "Paid") {
+    currentGcashOrder = null;
+    stopQrWaiting();
+    hideQrModal();
+    onPaid?.(order);
+  }
+}).then(async (unsubscribe) => {
+  qrOrderUnsubscribe = unsubscribe;
+
+  // Catch the case where payment already succeeded before we subscribed
+  try {
+    const fresh = await pb.collection('orders').getOne(order.id);
+    if (fresh.payment_status === "Paid" && currentGcashOrder) {
       currentGcashOrder = null;
       stopQrWaiting();
       hideQrModal();
       onPaid?.(order);
     }
-  }).then((unsubscribe) => {
-    qrOrderUnsubscribe = unsubscribe;
-  });
+  } catch (err) {
+    console.error("Failed to check order status:", err);
+  }
+});
 }
 
 async function cancelGcashOrder() {
