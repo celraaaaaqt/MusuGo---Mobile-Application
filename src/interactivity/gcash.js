@@ -1,10 +1,10 @@
 import { pb } from '../lib/pb.js';
 
-// Base URL of the Express payment server (server/server.js). Set
-// VITE_PAYMENT_SERVER_URL in your .env for production; defaults to the
-// local dev server.
-const PAYMENT_SERVER_URL =
-  import.meta.env.VITE_PAYMENT_SERVER_URL || "http://localhost:3000";
+// Base URL of the Express payment server. Trailing slashes are stripped so
+// the path never becomes "//api/...". Set VITE_PAYMENT_SERVER_URL before building.
+const PAYMENT_SERVER_URL = (
+  import.meta.env.VITE_PAYMENT_SERVER_URL || "http://localhost:3000"
+).replace(/\/+$/, "");
 
 const gcashQrModal = document.getElementById("gcash-qr-modal");
 const gcashQrImage = document.getElementById("gcash-qr-image");
@@ -16,7 +16,12 @@ const gcashQrCancel = document.getElementById("gcash-qr-cancel");
 
 let qrCountdownInterval = null;
 let qrOrderUnsubscribe = null;
-let currentGcashOrder = null; // { orderId, paymentId, items } for cancel/expiry cleanup
+let currentGcashOrder = null; // { orderId, paymentId, items }
+
+function hideQrModal() {
+  gcashQrModal.classList.add("hidden");
+  gcashQrModal.classList.remove("flex");
+}
 
 function stopQrWaiting() {
   if (qrCountdownInterval) {
@@ -29,8 +34,8 @@ function stopQrWaiting() {
   }
 }
 
-// Asks server.js to create the PayMongo Payment Intent + Payment Method
-// and attach them, returning the real QR Ph code. Throws on failure.
+// Asks the payment server to create the PayMongo Payment Intent and QR Ph code.
+// Throws on failure, including non-JSON responses.
 export async function requestGcashQr({ amount, orderId, orderNumber }) {
   const res = await fetch(`${PAYMENT_SERVER_URL}/api/create-qrph-intent`, {
     method: "POST",
@@ -38,74 +43,24 @@ export async function requestGcashQr({ amount, orderId, orderNumber }) {
     body: JSON.stringify({ amount, orderId, orderNumber }),
   });
 
-  const data = await res.json();
+  const text = await res.text();
+  let data = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // Not JSON: the server returned an HTML/text error page
+  }
+
   if (!res.ok) {
-    throw new Error(data.error || "Failed to create QR code");
+    throw new Error(data.error || `Failed to create QR code (HTTP ${res.status})`);
   }
 
   return data; // { paymentIntentId, qrImageUrl, expiresAt }
 }
 
-// Shows the QR modal, starts the expiry countdown, and subscribes to this
-// order's PocketBase record so the moment the webhook marks it "Paid" we
-// can call back into checkout.js to show the success modal.
-export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {}) {
-  stopQrWaiting(); // just in case one was already running
-
-  currentGcashOrder = { orderId: order.id, paymentId, items };
-
-  gcashQrOrderNumber.textContent = `#${order.order_number}`;
-  gcashQrTotal.textContent = `₱${Number(order.total).toFixed(2)}`;
-  gcashQrImage.src = qrData.qrImageUrl;
-  gcashQrStatus.textContent = "Waiting for payment…";
-
-  gcashQrModal.classList.remove("hidden");
-  gcashQrModal.classList.add("flex");
-
-  function tick() {
-    const msLeft = qrData.expiresAt - Date.now();
-
-    if (msLeft <= 0) {
-      gcashQrTimer.textContent = "Expired";
-      gcashQrStatus.textContent = "This QR code has expired. Restoring your order…";
-      clearInterval(qrCountdownInterval);
-      qrCountdownInterval = null;
-      cancelGcashOrder();
-      return;
-    }
-
-    const totalSeconds = Math.floor(msLeft / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    gcashQrTimer.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  tick();
-  qrCountdownInterval = setInterval(tick, 1000);
-
-  pb.collection('orders').subscribe(order.id, (e) => {
-    if (e.record.payment_status === "Paid") {
-      currentGcashOrder = null;
-      stopQrWaiting();
-
-      gcashQrModal.classList.add("hidden");
-      gcashQrModal.classList.remove("flex");
-
-      onPaid?.(order);
-    }
-  }).then((unsubscribe) => {
-    qrOrderUnsubscribe = unsubscribe;
-  });
-}
-
-// Restores stock and marks the order/payment "Cancelled" — used both when
-// the customer backs out of the QR modal and when the QR expires unpaid.
-async function cancelGcashOrder() {
-  if (!currentGcashOrder) return;
-
-  const { orderId, paymentId, items } = currentGcashOrder;
-  currentGcashOrder = null;
-
+// Restores stock and marks the order/payment "Cancelled". Used when the
+// customer backs out, when the QR expires, or when QR creation fails.
+export async function releaseOrder({ orderId, paymentId, items }) {
   for (const item of items) {
     try {
       await pb.collection('products').update(item.id, { "stocks+": item.quantity });
@@ -122,9 +77,65 @@ async function cancelGcashOrder() {
   }
 }
 
+export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {}) {
+  stopQrWaiting();
+
+  currentGcashOrder = { orderId: order.id, paymentId, items };
+
+  gcashQrOrderNumber.textContent = `#${order.order_number}`;
+  gcashQrTotal.textContent = `₱${Number(order.total).toFixed(2)}`;
+  gcashQrImage.src = qrData.qrImageUrl;
+  gcashQrStatus.textContent = "Waiting for payment…";
+
+  gcashQrModal.classList.remove("hidden");
+  gcashQrModal.classList.add("flex");
+
+  function tick() {
+    const msLeft = qrData.expiresAt - Date.now();
+
+    if (msLeft <= 0) {
+      stopQrWaiting();
+      hideQrModal();
+      cancelGcashOrder();
+      Swal.fire({
+        icon: "info",
+        title: "QR code expired",
+        text: "Your order was cancelled. Please place your order again.",
+      });
+      return;
+    }
+
+    const totalSeconds = Math.floor(msLeft / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    gcashQrTimer.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  tick();
+  qrCountdownInterval = setInterval(tick, 1000);
+
+  pb.collection('orders').subscribe(order.id, (e) => {
+    if (e.record.payment_status === "Paid") {
+      currentGcashOrder = null;
+      stopQrWaiting();
+      hideQrModal();
+      onPaid?.(order);
+    }
+  }).then((unsubscribe) => {
+    qrOrderUnsubscribe = unsubscribe;
+  });
+}
+
+async function cancelGcashOrder() {
+  if (!currentGcashOrder) return;
+
+  const order = currentGcashOrder;
+  currentGcashOrder = null;
+  await releaseOrder(order);
+}
+
 gcashQrCancel.addEventListener("click", () => {
   stopQrWaiting();
-  gcashQrModal.classList.add("hidden");
-  gcashQrModal.classList.remove("flex");
+  hideQrModal();
   cancelGcashOrder();
 });

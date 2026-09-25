@@ -147,7 +147,9 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
       qrImageUrl: code.image_url, // already a data:image/... base64 string
       // PayMongo typically expires QR Ph codes ~5 minutes after creation;
       // expires_at (if present) is a unix seconds timestamp
-      expiresAt: code.expires_at ? code.expires_at * 1000 : Date.now() + 5 * 60 * 1000,
+   expiresAt: code.expires_at
+  ? code.expires_at * 1000
+  : Date.now() + 30 * 60 * 1000,
     });
   } catch (err) {
     console.error("create-qrph-intent failed:", err);
@@ -206,31 +208,39 @@ app.post(
     const event = JSON.parse(rawBody);
     const eventType = event?.data?.attributes?.type;
 
-    if (eventType === "payment.paid") {
-      const intent = event.data.attributes.data;
-      const orderId = intent.attributes.metadata?.order_id;
+      if (eventType === "payment.paid") {
+      try {
+        const payment = event.data.attributes.data;
+        let orderId = payment.attributes.metadata?.order_id;
 
-      if (orderId) {
-        try {
+        // Fall back to fetching the payment intent, which holds our metadata
+        if (!orderId && payment.attributes.payment_intent_id) {
+          const intentRes = await fetch(
+            `https://api.paymongo.com/v1/payment_intents/${payment.attributes.payment_intent_id}`,
+            { headers: { Authorization: paymongoAuth } }
+          );
+          const intentJson = await intentRes.json();
+          orderId = intentJson?.data?.attributes?.metadata?.order_id;
+        }
+
+        if (orderId) {
           const pb = new PocketBase(POCKETBASE_URL);
           await pb.collection("_superusers").authWithPassword(
             PB_SUPERUSER_EMAIL,
             PB_SUPERUSER_PASSWORD
           );
 
-          await pb.collection("orders").update(orderId, {
-            payment_status: "Paid",
-          });
+          await pb.collection("orders").update(orderId, { payment_status: "Paid" });
 
           const paymentRecord = await pb
             .collection("payment")
             .getFirstListItem(`order="${orderId}"`);
-          await pb.collection("payment").update(paymentRecord.id, {
-            status: "Complete",
-          });
-        } catch (err) {
-          console.error("Failed to update PocketBase after payment:", err);
+          await pb.collection("payment").update(paymentRecord.id, { status: "Complete" });
+        } else {
+          console.warn("payment.paid webhook had no order_id metadata");
         }
+      } catch (err) {
+        console.error("Failed to update PocketBase after payment:", err);
       }
     }
 

@@ -1,6 +1,6 @@
 import { pb } from '../lib/pb.js';
 import { clearCart, getCart } from "./cart.js";
-import { requestGcashQr, showGcashQrModal } from "./gcash.js";
+import { requestGcashQr, showGcashQrModal, releaseOrder } from "./gcash.js";
 
 const checkoutItems = document.querySelector("#checkout-items");
 const checkoutTotal = document.querySelector("#checkout-total");
@@ -498,11 +498,17 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
   // GCash: ask gcash.js for a real QR Ph code from the payment server
   const orderedItems = cart.map((item) => ({ id: item.id, quantity: item.quantity }));
 
-  const qrData = await requestGcashQr({
-    amount: total,
-    orderId: order.id,
-    orderNumber: order.order_number,
-  });
+  let qrData;
+  try {
+    qrData = await requestGcashQr({
+      amount: total,
+      orderId: order.id,
+      orderNumber: order.order_number,
+    });
+  } catch (qrErr) {
+    await releaseOrder({ orderId: order.id, paymentId: payment.id, items: orderedItems });
+    throw qrErr;
+  }
 
   clearCart();
 
