@@ -84,6 +84,13 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
 
   currentGcashOrder = { orderId: order.id, paymentId, items };
 
+  // Guard against a missing/invalid expiresAt from the server so a bad
+  // value never causes the modal to expire before it's even visible.
+  const expiresAt =
+    Number.isFinite(qrData.expiresAt) && qrData.expiresAt > Date.now()
+      ? qrData.expiresAt
+      : Date.now() + 5 * 60 * 1000; // fall back to a 5-minute window
+
   gcashQrOrderNumber.textContent = `#${order.order_number}`;
   gcashQrTotal.textContent = `₱${Number(order.total).toFixed(2)}`;
   gcashQrImage.src = qrData.qrImageUrl;
