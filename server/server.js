@@ -142,15 +142,13 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
       return res.status(502).json({ error: "PayMongo did not return a QR code" });
     }
 
-    res.json({
-      paymentIntentId: intentId,
-      qrImageUrl: code.image_url, // already a data:image/... base64 string
-      // PayMongo typically expires QR Ph codes ~5 minutes after creation;
-      // expires_at (if present) is a unix seconds timestamp
-   expiresAt: code.expires_at
-  ? code.expires_at * 1000
-  : Date.now() + 30 * 60 * 1000,
-    });
+   res.json({
+  paymentIntentId: intentId,
+  qrImageUrl: code.image_url,
+  expiresAt: code.expires_at
+    ? code.expires_at * 1000
+    : Date.now() + 30 * 60 * 1000,
+});
   } catch (err) {
     console.error("create-qrph-intent failed:", err);
     res.status(500).json({ error: "Failed to create QR Ph payment" });
