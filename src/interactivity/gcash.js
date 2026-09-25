@@ -58,8 +58,9 @@ export async function requestGcashQr({ amount, orderId, orderNumber }) {
   return data; // { paymentIntentId, qrImageUrl, expiresAt }
 }
 
-// Restores stock and marks the order/payment "Cancelled". Used when the
-// customer backs out, when the QR expires, or when QR creation fails.
+// Restores stock and marks the order/payment "Cancelled". Runs through the
+// payment server (not directly against PocketBase) since only superusers
+// are allowed to update orders/payment/products, and the browser is anonymous.
 export async function releaseOrder({ orderId, paymentId, items }) {
   try {
     const res = await fetch(`${PAYMENT_SERVER_URL}/api/cancel-order`, {
@@ -75,8 +76,11 @@ export async function releaseOrder({ orderId, paymentId, items }) {
   }
 }
 
+// Shows the QR modal, starts the expiry countdown, and subscribes to this
+// order's PocketBase record so the moment the webhook marks it "Paid" we
+// can call back into checkout.js to show the success modal.
 export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {}) {
-  stopQrWaiting();
+  stopQrWaiting(); // just in case one was already running
 
   currentGcashOrder = { orderId: order.id, paymentId, items };
 
@@ -113,30 +117,22 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
   qrCountdownInterval = setInterval(tick, 1000);
 
   pb.collection('orders').subscribe(order.id, (e) => {
-  if (e.record.payment_status === "Paid") {
-    currentGcashOrder = null;
-    stopQrWaiting();
-    hideQrModal();
-    onPaid?.(order);
-  }
-}).then(async (unsubscribe) => {
-  qrOrderUnsubscribe = unsubscribe;
-
-  // Catch the case where payment already succeeded before we subscribed
-  try {
-    const fresh = await pb.collection('orders').getOne(order.id);
-    if (fresh.payment_status === "Paid" && currentGcashOrder) {
+    if (e.record.payment_status === "Paid") {
       currentGcashOrder = null;
       stopQrWaiting();
-      hideQrModal();
+
+      gcashQrModal.classList.add("hidden");
+      gcashQrModal.classList.remove("flex");
+
       onPaid?.(order);
     }
-  } catch (err) {
-    console.error("Failed to check order status:", err);
-  }
-});
+  }).then((unsubscribe) => {
+    qrOrderUnsubscribe = unsubscribe;
+  });
 }
 
+// Cancels the current GCash order via the payment server — used both when
+// the customer backs out of the QR modal and when the QR expires unpaid.
 async function cancelGcashOrder() {
   if (!currentGcashOrder) return;
 
