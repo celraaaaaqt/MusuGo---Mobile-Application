@@ -276,9 +276,12 @@ app.post("/api/cancel-order", express.json(), async (req, res) => {
     await pb.collection("payment").update(paymentId, { status: "Cancelled" });
 
     res.json({ ok: true });
-  } catch (err) {
+    } catch (err) {
     console.error("cancel-order failed:", err);
-    res.status(500).json({ error: "Failed to cancel order" });
+    res.status(500).json({
+      error: "Failed to cancel order",
+      detail: err?.data ? JSON.stringify(err.data) : (err?.message || String(err)),
+    });
   }
 });
 
