@@ -248,6 +248,40 @@ app.post(
   }
 );
 
+// Cancels an unpaid GCash order: restores stock and marks order/payment cancelled.
+// Runs server-side so it can use superuser auth.
+app.post("/api/cancel-order", express.json(), async (req, res) => {
+  const { orderId, paymentId, items } = req.body;
+
+  if (!orderId || !paymentId || !Array.isArray(items)) {
+    return res.status(400).json({ error: "orderId, paymentId, and items are required" });
+  }
+
+  try {
+    const pb = new PocketBase(POCKETBASE_URL);
+    await pb.collection("_superusers").authWithPassword(
+      PB_SUPERUSER_EMAIL,
+      PB_SUPERUSER_PASSWORD
+    );
+
+    for (const item of items) {
+      try {
+        await pb.collection("products").update(item.id, { "stocks+": item.quantity });
+      } catch (err) {
+        console.error("Failed to restore stock for", item.id, err);
+      }
+    }
+
+    await pb.collection("orders").update(orderId, { payment_status: "Cancelled" });
+    await pb.collection("payment").update(paymentId, { status: "Cancelled" });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("cancel-order failed:", err);
+    res.status(500).json({ error: "Failed to cancel order" });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 app.get("/health", (req, res) => {

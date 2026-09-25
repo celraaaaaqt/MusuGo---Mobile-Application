@@ -61,19 +61,17 @@ export async function requestGcashQr({ amount, orderId, orderNumber }) {
 // Restores stock and marks the order/payment "Cancelled". Used when the
 // customer backs out, when the QR expires, or when QR creation fails.
 export async function releaseOrder({ orderId, paymentId, items }) {
-  for (const item of items) {
-    try {
-      await pb.collection('products').update(item.id, { "stocks+": item.quantity });
-    } catch (err) {
-      console.error('Failed to restore stock for', item.id, err);
-    }
-  }
-
   try {
-    await pb.collection('orders').update(orderId, { payment_status: "Cancelled" });
-    await pb.collection('payment').update(paymentId, { status: "Cancelled" });
+    const res = await fetch(`${PAYMENT_SERVER_URL}/api/cancel-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, paymentId, items }),
+    });
+    if (!res.ok) {
+      console.error("cancel-order returned", res.status);
+    }
   } catch (err) {
-    console.error('Failed to mark order cancelled:', err);
+    console.error("Failed to cancel order:", err);
   }
 }
 
