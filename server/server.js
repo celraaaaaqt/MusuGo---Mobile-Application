@@ -113,14 +113,14 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
     if (!intent.ok) return res.status(intent.status).json(intent.data);
     const intentId = intent.data.data.id;
 
-    // Step 2: create the qrph Payment Method
+     // Step 2: create the qrph Payment Method
     const method = await paymongoRequest("payment_methods", {
       data: {
         attributes: {
           type: "qrph",
           billing: {
             name: billingName || "Customer",
-            ...(billingEmail ? { email: billingEmail } : {}),
+            email: billingEmail || "customer@musugo.local",
             ...(billingPhone ? { phone: billingPhone } : {}),
           },
         },
