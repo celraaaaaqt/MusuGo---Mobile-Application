@@ -1,6 +1,6 @@
 import { pb } from '../lib/pb.js';
 import { clearCart, getCart } from "./cart.js";
-
+import { requestGcashQr, showGcashQrModal } from "./gcash.js";
 
 const checkoutItems = document.querySelector("#checkout-items");
 const checkoutTotal = document.querySelector("#checkout-total");
@@ -416,16 +416,37 @@ placeOrder.addEventListener("click", () => {
       return;
     }
 
-    //show a loading state right away — the PocketBase calls below can take
-    //a moment, and the customer shouldn't just be staring at nothing
+    //show loading effect for customer to know wether their order is processing.
     checkoutModal.classList.add("hidden");
     processingModal.classList.remove("hidden");
     processingModal.classList.add("flex");
 
         try {
   // Step A: create one cart_items record per product line + deduct stock
-  const cartItemIds = [];
+ const cartItemIds = [];
+  const decrementedItems = [];
+
   for (const item of cart) {
+    try {
+      await pb.collection('products').update(item.id, {
+        "stocks-": item.quantity,
+      });
+      decrementedItems.push(item);
+    } catch (stockErr) {
+      for (const restoreItem of decrementedItems) {
+        try {
+          await pb.collection('products').update(restoreItem.id, {
+            "stocks+": restoreItem.quantity,
+          });
+        } catch (restoreErr) {
+          console.error('Failed to restore stock for', restoreItem.id, restoreErr);
+        }
+      }
+      const outOfStockError = new Error(`Sorry, "${item.name}" doesn't have enough stock left.`);
+      outOfStockError.userFacing = true;
+      throw outOfStockError;
+    }
+
     const cartItem = await pb.collection('cart_items').create({
       product: item.id,
       quantity: item.quantity,
@@ -433,47 +454,69 @@ placeOrder.addEventListener("click", () => {
       subtotal: item.price * item.quantity,
     });
     cartItemIds.push(cartItem.id);
-
-    // deduct stock
-    const product = await pb.collection('products').getOne(item.id);
-    await pb.collection('products').update(item.id, {
-      stocks: Math.max(0, product.stocks - item.quantity),
-    });
   }
 
-  // Step A.5: generate order number
-  // Step A.5: generate order number (based on today's date + time, no List permission needed)
+  //order number depends on the current date and time
 const now = new Date();
 const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
 
-  // Step B: create the order
+    // Step B: create the order. Both payment methods start "Pending" —
+  // Cash gets confirmed at the counter, GCash gets flipped to "Paid" by
+  // the PayMongo webhook once the customer actually scans and pays.
   const order = await pb.collection('orders').create({
     order_number: orderNumber,
     cart_items: cartItemIds,
     total: total,
-    payment_status: paymentMethod === "Cash" ? "Pending" : "Paid",
+    payment_status: "Pending",
   });
 
   // Step C: create the payment record
-  await pb.collection('payment').create({
+  const payment = await pb.collection('payment').create({
     order: order.id,
     amount: total,
     payment_method: paymentMethod,
-    status: paymentMethod === "Cash" ? "Pending" : "Complete",
+    status: "Pending",
+  });
+
+  if (paymentMethod === "Cash") {
+    clearCart();
+
+    processingModal.classList.add("hidden");
+    processingModal.classList.remove("flex");
+
+    successOrderNumber.textContent = `#${order.order_number}`;
+    checkoutModal.classList.add("hidden");
+    orderSuccessModal.classList.remove("hidden");
+    orderSuccessModal.classList.add("flex");
+
+    cashReceived.value = "";
+    cashChange.textContent = "₱0.00";
+
+    return;
+  }
+
+  // GCash: ask gcash.js for a real QR Ph code from the payment server
+  const orderedItems = cart.map((item) => ({ id: item.id, quantity: item.quantity }));
+
+  const qrData = await requestGcashQr({
+    amount: total,
+    orderId: order.id,
+    orderNumber: order.order_number,
   });
 
   clearCart();
 
   processingModal.classList.add("hidden");
   processingModal.classList.remove("flex");
-
-  successOrderNumber.textContent = `#${order.order_number}`;
   checkoutModal.classList.add("hidden");
-  orderSuccessModal.classList.remove("hidden");
-  orderSuccessModal.classList.add("flex");
 
-  cashReceived.value = "";
-  cashChange.textContent = "₱0.00";
+  showGcashQrModal(order, qrData, payment.id, orderedItems, {
+    onPaid: (paidOrder) => {
+      successOrderNumber.textContent = `#${paidOrder.order_number}`;
+      orderSuccessModal.classList.remove("hidden");
+      orderSuccessModal.classList.add("flex");
+    },
+  });
 
 } catch (err) {
   console.error('Order failed:', err);
@@ -485,7 +528,7 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
   Swal.fire({
     icon: "error",
     title: "Order failed",
-    text: "Something went wrong while placing your order. Please try again."
+        text: err.userFacing ? err.message : "Something went wrong while placing your order. Please try again."
   });
 }
 

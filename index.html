@@ -1275,14 +1275,31 @@
 
   </div>
 </div>
+<div id="gcash-qr-modal" class="fixed inset-0 z-[125] hidden bg-black/50 backdrop-blur-sm items-center justify-center p-4">
+  <div class="w-full max-w-xs rounded-3xl bg-white p-6 text-center shadow-xl">
+    <h2 class="font-jakarta text-lg font-bold text-primary-800">Scan to Pay</h2>
+    <p class="text-sm text-neutral-500 mt-1">Order <span id="gcash-qr-order-number" class="font-semibold">#000000</span></p>
+    <img id="gcash-qr-image" alt="GCash QR Ph code" class="w-48 h-48 mx-auto mt-5 rounded-xl border border-neutral-200 object-contain" />
+    <p class="text-sm text-neutral-500 mt-4">Total to pay</p>
+    <p id="gcash-qr-total" class="font-jakarta font-bold text-xl text-secondary-600 mt-1">₱0</p>
+    <div class="mt-5 flex items-center justify-center gap-2 rounded-xl bg-neutral-50 p-3">
+      <div class="w-4 h-4 rounded-full border-2 border-primary-200 border-t-primary-600 animate-spin"></div>
+      <p id="gcash-qr-status" class="text-sm text-neutral-600">Waiting for payment…</p>
+    </div>
+    <p class="text-xs text-neutral-400 mt-3">Expires in <span id="gcash-qr-timer" class="font-semibold">5:00</span></p>
+    <button id="gcash-qr-cancel" class="mt-5 w-full h-12 rounded-xl bg-white border border-neutral-300 text-neutral-700 font-semibold hover:bg-neutral-100 active:scale-[0.98] transition">Cancel</button>
+  </div>
+</div>
 <div
   id="toast-container"
   class="fixed top-6 inset-x-0 z-[200] flex flex-col items-center gap-3 px-4 pointer-events-none"
 ></div>
+
 <script type="module" src="/src/main.js"></script>
 <script type="module" src="/src/interactivity/cart.js"></script>
 <script type="module" src="/src/interactivity/product_category.js"></script>
 <script type="module" src="/src/interactivity/search_products.js"></script>
 <script type="module" src="/src/interactivity/checkout.js"></script>
+<script type="module" src="/src/interactivity/gcash.js"></script>
 </body>
 </html>

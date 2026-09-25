@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import crypto from "crypto";
@@ -237,4 +238,15 @@ app.post(
   }
 );
 
-app.listen(process.env.PORT || 3000, () => console.log("Payment server running"));
+const PORT = process.env.PORT || 3000;
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "MusuGo Payment Server",
+  });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Payment server running on port ${PORT}`);
+});
