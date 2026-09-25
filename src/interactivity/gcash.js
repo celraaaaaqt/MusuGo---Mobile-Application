@@ -21,6 +21,8 @@ let currentGcashOrder = null; // { orderId, paymentId, items }
 function hideQrModal() {
   gcashQrModal.classList.add("hidden");
   gcashQrModal.classList.remove("flex");
+  const testLink = document.getElementById("gcash-qr-test-link");
+  if (testLink) testLink.remove();
 }
 
 function stopQrWaiting() {
@@ -95,6 +97,22 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
   gcashQrTotal.textContent = `₱${Number(order.total).toFixed(2)}`;
   gcashQrImage.src = qrData.qrImageUrl;
   gcashQrStatus.textContent = "Waiting for payment…";
+
+  // Test mode only: PayMongo returns a test_url that simulates a paid
+  // QR Ph transaction without touching real money. Injected dynamically
+  // since it has no fixed spot in index.html.
+  let testLink = document.getElementById("gcash-qr-test-link");
+  if (testLink) testLink.remove();
+  if (qrData.testUrl) {
+    testLink = document.createElement("a");
+    testLink.id = "gcash-qr-test-link";
+    testLink.href = qrData.testUrl;
+    testLink.target = "_blank";
+    testLink.rel = "noopener noreferrer";
+    testLink.textContent = "Simulate payment (test mode)";
+    testLink.className = "block text-center text-sm text-blue-600 underline mt-2";
+    gcashQrStatus.insertAdjacentElement("afterend", testLink);
+  }
 
   gcashQrModal.classList.remove("hidden");
   gcashQrModal.classList.add("flex");

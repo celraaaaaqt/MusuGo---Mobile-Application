@@ -141,16 +141,17 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
       console.error("No QR code in attach response:", attach.data);
       return res.status(502).json({ error: "PayMongo did not return a QR code" });
     }
-
-   const rawExpiresAt = Number(code.expires_at) * 1000;
-   const expiresAt = Number.isFinite(rawExpiresAt) && rawExpiresAt > Date.now()
-     ? rawExpiresAt
-     : Date.now() + 30 * 60 * 1000;
+    if (code.test_url) {
+      console.log("Test mode — simulate this payment at:", code.test_url);
+    }
 
    res.json({
   paymentIntentId: intentId,
   qrImageUrl: code.image_url,
-  expiresAt,
+  expiresAt: Number.isFinite(Number(code.expires_at) * 1000) && Number(code.expires_at) * 1000 > Date.now()
+    ? Number(code.expires_at) * 1000
+    : Date.now() + 30 * 60 * 1000,
+  testUrl: code.test_url || null,
 });
   } catch (err) {
     console.error("create-qrph-intent failed:", err);
@@ -213,6 +214,11 @@ app.post(
       try {
         const payment = event.data.attributes.data;
         let orderId = payment.attributes.metadata?.order_id;
+        console.log("payment.paid received:", {
+          paymentId: payment.id,
+          paymentIntentId: payment.attributes.payment_intent_id,
+          metadataOnPayment: payment.attributes.metadata,
+        });
 
         // Fall back to fetching the payment intent, which holds our metadata
         if (!orderId && payment.attributes.payment_intent_id) {
@@ -221,6 +227,18 @@ app.post(
             { headers: { Authorization: paymongoAuth } }
           );
           const intentJson = await intentRes.json();
+          if (!intentRes.ok) {
+            console.error(
+              "Failed to fetch payment intent for metadata fallback:",
+              intentRes.status,
+              JSON.stringify(intentJson)
+            );
+          } else {
+            console.log(
+              "Fetched intent metadata:",
+              intentJson?.data?.attributes?.metadata
+            );
+          }
           orderId = intentJson?.data?.attributes?.metadata?.order_id;
         }
 
@@ -230,6 +248,15 @@ app.post(
             PB_SUPERUSER_EMAIL,
             PB_SUPERUSER_PASSWORD
           );
+
+          const currentOrder = await pb.collection("orders").getOne(orderId);
+          if (currentOrder.payment_status === "Cancelled") {
+            console.warn(
+              `RECONCILE NEEDED: order ${orderId} was already Cancelled ` +
+              `(stock restored) but payment.paid arrived after the fact. ` +
+              `Marking Paid anyway — check stock manually.`
+            );
+          }
 
           await pb.collection("orders").update(orderId, { payment_status: "Paid" });
 
@@ -264,6 +291,15 @@ app.post("/api/cancel-order", express.json(), async (req, res) => {
       PB_SUPERUSER_EMAIL,
       PB_SUPERUSER_PASSWORD
     );
+
+    // Guard against the client-side QR expiry timer racing the webhook:
+    // if the webhook already marked this order Paid, never cancel it or
+    // restore its stock, even if this call arrives after the timer fires.
+    const currentOrder = await pb.collection("orders").getOne(orderId);
+    if (currentOrder.payment_status === "Paid") {
+      console.warn(`cancel-order skipped: order ${orderId} is already Paid`);
+      return res.json({ ok: true, skipped: true, reason: "already_paid" });
+    }
 
     for (const item of items) {
       try {
