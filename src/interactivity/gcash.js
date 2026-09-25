@@ -127,15 +127,39 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
     if (e.record.payment_status === "Paid") {
       currentGcashOrder = null;
       stopQrWaiting();
-
-      gcashQrModal.classList.add("hidden");
-      gcashQrModal.classList.remove("flex");
-
-      onPaid?.(order);
+      showPaymentConfirmedTransition(order, onPaid);
     }
   }).then((unsubscribe) => {
     qrOrderUnsubscribe = unsubscribe;
   });
+}
+
+// Swaps the QR image for a spinner and updates the status text once payment
+// is confirmed, holds briefly so the customer sees the confirmation, then
+// closes the modal and hands off to the success modal via onPaid.
+function showPaymentConfirmedTransition(order, onPaid) {
+  gcashQrImage.classList.add("hidden");
+  gcashQrCancel.disabled = true;
+
+  let spinner = document.getElementById("gcash-qr-spinner");
+  if (!spinner) {
+    spinner = document.createElement("div");
+    spinner.id = "gcash-qr-spinner";
+    spinner.className =
+      "w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto";
+    gcashQrImage.insertAdjacentElement("afterend", spinner);
+  }
+  spinner.classList.remove("hidden");
+
+  gcashQrStatus.textContent = "Payment confirmed! Processing your order…";
+
+  setTimeout(() => {
+    spinner.remove();
+    gcashQrImage.classList.remove("hidden");
+    gcashQrCancel.disabled = false;
+    hideQrModal();
+    onPaid?.(order);
+  }, 1500);
 }
 
 // Cancels the current GCash order via the payment server — used both when
