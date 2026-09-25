@@ -100,7 +100,7 @@ export function showGcashQrModal(order, qrData, paymentId, items, { onPaid } = {
   gcashQrModal.classList.add("flex");
 
   function tick() {
-    const msLeft = qrData.expiresAt - Date.now();
+    const msLeft = expiresAt - Date.now();
 
     if (msLeft <= 0) {
       stopQrWaiting();

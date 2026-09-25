@@ -142,12 +142,15 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
       return res.status(502).json({ error: "PayMongo did not return a QR code" });
     }
 
+   const rawExpiresAt = Number(code.expires_at) * 1000;
+   const expiresAt = Number.isFinite(rawExpiresAt) && rawExpiresAt > Date.now()
+     ? rawExpiresAt
+     : Date.now() + 30 * 60 * 1000;
+
    res.json({
   paymentIntentId: intentId,
   qrImageUrl: code.image_url,
-  expiresAt: code.expires_at
-    ? code.expires_at * 1000
-    : Date.now() + 30 * 60 * 1000,
+  expiresAt,
 });
   } catch (err) {
     console.error("create-qrph-intent failed:", err);
