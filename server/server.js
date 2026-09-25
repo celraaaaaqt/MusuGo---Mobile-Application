@@ -141,9 +141,6 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
       console.error("No QR code in attach response:", attach.data);
       return res.status(502).json({ error: "PayMongo did not return a QR code" });
     }
-    if (code.test_url) {
-      console.log("Test mode — simulate this payment at:", code.test_url);
-    }
 
    res.json({
   paymentIntentId: intentId,
@@ -151,7 +148,6 @@ app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
   expiresAt: Number.isFinite(Number(code.expires_at) * 1000) && Number(code.expires_at) * 1000 > Date.now()
     ? Number(code.expires_at) * 1000
     : Date.now() + 30 * 60 * 1000,
-  testUrl: code.test_url || null,
 });
   } catch (err) {
     console.error("create-qrph-intent failed:", err);
