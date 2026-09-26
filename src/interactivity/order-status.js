@@ -1,5 +1,6 @@
 import { pb } from "../lib/pb.js";
 
+
 const statusCard = document.getElementById("status-card");
 
 const params = new URLSearchParams(window.location.search);
