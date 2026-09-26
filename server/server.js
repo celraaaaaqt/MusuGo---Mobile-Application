@@ -4,6 +4,9 @@ import cors from "cors";
 import crypto from "crypto";
 import PocketBase from "pocketbase";
 
+import nodemailer from "nodemailer";
+import QRCode from "qrcode";
+
 const app = express();
 app.use(cors());
 

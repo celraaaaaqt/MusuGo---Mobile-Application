@@ -1,6 +1,7 @@
 import { pb } from '../lib/pb.js';
 import { clearCart, getCart } from "./cart.js";
 import { requestGcashQr, showGcashQrModal, releaseOrder } from "./gcash.js";
+import { collectCustomerInfo } from "../customer/customer_info.js";
 
 const checkoutItems = document.querySelector("#checkout-items");
 const checkoutTotal = document.querySelector("#checkout-total");
@@ -280,7 +281,7 @@ cashReceived.addEventListener("input", () => {
 });
 
 
-placeOrder.addEventListener("click", () => {
+placeOrder.addEventListener("click", async () => {
 
   const cart = getCart();
 
@@ -335,6 +336,18 @@ placeOrder.addEventListener("click", () => {
     return;
   }
 
+  // Ask for name / email / contact before we go any further. Swap the
+  // checkout modal for the customer-info modal and wait for it.
+  checkoutModal.classList.add("hidden");
+  const customerInfo = await collectCustomerInfo();
+
+  if (!customerInfo) {
+    // They tapped Back — return them to checkout, nothing was created yet.
+    checkoutModal.classList.remove("hidden");
+    return;
+  }
+
+  checkoutModal.classList.remove("hidden");
 
   // Build order summary
   const orderSummary = cart.map((item) => {

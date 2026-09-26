@@ -21,6 +21,8 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
-    "pocketbase": "^0.28.1"
+    "nodemailer": "^10.0.10",
+    "pocketbase": "^0.28.1",
+    "qrcode": "^1.5.4"
   }
 }
