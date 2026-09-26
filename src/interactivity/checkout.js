@@ -481,26 +481,16 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
   if (paymentMethod === "Cash") {
     clearCart();
 
-    // Brief "confirmed" hold before switching to the success modal, to
-    // mirror the GCash payment-confirmed transition rather than jumping
-    // straight from the processing spinner to success.
-    const processingText = processingModal.querySelector("p, span, h2, h3");
-    if (processingText) {
-      processingText.textContent = "Order confirmed!";
-    }
+    processingModal.classList.add("hidden");
+    processingModal.classList.remove("flex");
 
-    setTimeout(() => {
-      processingModal.classList.add("hidden");
-      processingModal.classList.remove("flex");
+    successOrderNumber.textContent = `#${order.order_number}`;
+    checkoutModal.classList.add("hidden");
+    orderSuccessModal.classList.remove("hidden");
+    orderSuccessModal.classList.add("flex");
 
-      successOrderNumber.textContent = `#${order.order_number}`;
-      checkoutModal.classList.add("hidden");
-      orderSuccessModal.classList.remove("hidden");
-      orderSuccessModal.classList.add("flex");
-
-      cashReceived.value = "";
-      cashChange.textContent = "₱0.00";
-    }, 1500);
+    cashReceived.value = "";
+    cashChange.textContent = "₱0.00";
 
     return;
   }
