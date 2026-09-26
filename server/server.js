@@ -398,7 +398,7 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 //customer receipt
-app.post("/api/send-receipt", async (req, res) => {
+app.post("/api/send-receipt", express.json(), async (req, res) => {
   const { orderId } = req.body;
 
   if (!orderId) {
