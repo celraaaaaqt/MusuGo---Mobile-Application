@@ -433,10 +433,8 @@ app.post("/api/send-receipt", express.json(), async (req, res) => {
 
 async function sendReceiptEmail({ to, order, customerName, items }) {
   const statusUrl = `${SITE_URL}/order-status.html?id=${order.id}`;
-
-  // Generate the QR as an image buffer (not a data URL) — email clients
-  // handle a real attached image far more reliably than inline base64.
   const qrBuffer = await QRCode.toBuffer(statusUrl, { width: 200, margin: 1 });
+  const qrBase64 = qrBuffer.toString("base64");
 
   const itemsHtml = items
     .map(
@@ -453,35 +451,42 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
     <div style="font-family: sans-serif; max-width: 400px; margin: auto;">
       <h2 style="color:#7a1f2b;">MusuGo Receipt</h2>
       <p>Hi ${customerName}, thanks for your order!</p>
-
       <p><strong>Order #${order.order_number}</strong></p>
-
       <table style="width:100%; border-top:1px solid #eee; border-bottom:1px solid #eee; margin:12px 0;">
         ${itemsHtml}
       </table>
-
       <p style="font-weight:bold; font-size:18px;">Total: ₱${Number(order.total).toFixed(2)}</p>
-
       <p>Scan the QR code below anytime to check your order status:</p>
       <img src="cid:receipt-qr" alt="Order status QR code" width="150" height="150" />
-
       <p style="font-size:12px; color:#888;">
         Or open this link: <a href="${statusUrl}">${statusUrl}</a>
       </p>
     </div>
   `;
 
-  await mailTransporter.sendMail({
-    from: `"MusuGo" <${GMAIL_USER}>`,
-    to,
-    subject: `Your MusuGo Receipt - Order #${order.order_number}`,
-    html,
-    attachments: [
-      {
-        filename: "qrcode.png",
-        content: qrBuffer,
-        cid: "receipt-qr", // referenced by src="cid:receipt-qr" above
-      },
-    ],
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: { name: "MusuGo", email: GMAIL_USER },
+      to: [{ email: to, name: customerName }],
+      subject: `Your MusuGo Receipt - Order #${order.order_number}`,
+      htmlContent: html,
+      attachment: [
+        {
+          content: qrBase64,
+          name: "qrcode.png",
+        },
+      ],
+    }),
   });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`Brevo send failed: ${response.status} ${errBody}`);
+  }
 }
