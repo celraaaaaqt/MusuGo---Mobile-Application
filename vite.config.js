@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
+import { resolve } from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -27,6 +28,12 @@ export default defineConfig({
     build: {
         target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
         minify: !process.env.TAURI_ENV_DEBUG,
-        sourcemap: !!process.env.TAURI_ENV_DEBUG
+        sourcemap: !!process.env.TAURI_ENV_DEBUG,
+        rollupOptions: {
+            input: {
+                main: resolve(__dirname, "index.html"),
+                orderStatus: resolve(__dirname, "order-status.html"),
+            },
+        },
     }
 });
