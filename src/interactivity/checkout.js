@@ -483,6 +483,15 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
     payment_status: "Pending",
   });
 
+    // Save what the customer typed into the customer-info modal, linked to
+  // this order — this is what the email receipt looks up later.
+  await pb.collection('customer_info').create({
+    orders: order.id,
+    customer_name: customerInfo.name,
+    customer_gmail: customerInfo.email,
+    customer_contact: customerInfo.contact,
+  });
+
   // Step C: create the payment record
   const payment = await pb.collection('payment').create({
     order: order.id,
@@ -491,7 +500,7 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
     status: "Pending",
   });
 
-  if (paymentMethod === "Cash") {
+   if (paymentMethod === "Cash") {
     clearCart();
 
     processingModal.classList.add("hidden");
@@ -504,6 +513,15 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
 
     cashReceived.value = "";
     cashChange.textContent = "₱0.00";
+
+    // Cash orders skip the GCash webhook entirely, so this is the only
+    // place their receipt email gets triggered. Not awaited on purpose —
+    // a slow/failed email should never hold up the success screen.
+    fetch(`${import.meta.env.VITE_PAYMENT_SERVER_URL}/api/send-receipt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: order.id }),
+    }).catch((err) => console.error("send-receipt failed:", err));
 
     return;
   }

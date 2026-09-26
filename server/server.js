@@ -16,11 +16,56 @@ const {
   POCKETBASE_URL,
   PB_SUPERUSER_EMAIL,
   PB_SUPERUSER_PASSWORD,
+  GMAIL_USER,
+  GMAIL_APP_PASSWORD,
+  SITE_URL,
 } = process.env;
 
 // PayMongo needs "Basic base64(secret_key:)" auth
 const paymongoAuth =
   "Basic " + Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString("base64");
+
+const mailTransporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: GMAIL_USER,
+    pass: GMAIL_APP_PASSWORD,
+  },
+});
+
+// Reused by the webhook and the /api/send-receipt endpoint — both need an
+// authenticated superuser client to read orders/customer_info.
+async function getSuperuserPb() {
+  const pb = new PocketBase(POCKETBASE_URL);
+  await pb.collection("_superusers").authWithPassword(
+    PB_SUPERUSER_EMAIL,
+    PB_SUPERUSER_PASSWORD
+  );
+  return pb;
+}
+
+async function getReceiptData(orderId) {
+  const pb = await getSuperuserPb();
+
+  const order = await pb.collection("orders").getOne(orderId, {
+    expand: "cart_items,cart_items.product",
+  });
+
+  // customer_info isn't embedded on the order — it's a separate collection
+  // with an "orders" relation pointing back, so we look it up separately.
+  const customerInfo = await pb
+    .collection("customer_info")
+    .getFirstListItem(`orders = "${orderId}"`)
+    .catch(() => null);
+
+  const items = (order.expand?.cart_items || []).map((ci) => ({
+    name: ci.expand?.product?.product_name || "Item",
+    quantity: ci.quantity,
+    price: ci.price,
+  }));
+
+  return { order, customerInfo, items };
+}
 
 // PayMongo signs webhooks differently per mode (test vs live) — figure out
 // which one we're in from the secret key prefix so we compare against the
@@ -257,7 +302,25 @@ app.post(
             );
           }
 
-          await pb.collection("orders").update(orderId, { payment_status: "Paid" });
+
+          //for completed order and will send a qr on customer gmail account.
+                    await pb.collection("orders").update(orderId, { payment_status: "Paid" });
+
+          try {
+            const { order, customerInfo, items } = await getReceiptData(orderId);
+            if (customerInfo?.customer_gmail) {
+              await sendReceiptEmail({
+                to: customerInfo.customer_gmail,
+                order,
+                customerName: customerInfo.customer_name,
+                items,
+              });
+            } else {
+              console.warn(`No customer_info found for order ${orderId} — skipping email`);
+            }
+          } catch (emailErr) {
+            console.error("Receipt email failed (GCash):", emailErr);
+          }
 
           const paymentRecord = await pb
             .collection("payment")
@@ -333,3 +396,88 @@ app.get("/health", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Payment server running on port ${PORT}`);
 });
+
+//customer receipt
+app.post("/api/send-receipt", async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ error: "orderId is required" });
+  }
+
+  try {
+    const { order, customerInfo, items } = await getReceiptData(orderId);
+
+    if (!customerInfo?.customer_gmail) {
+      return res.status(404).json({ error: "No customer info found for this order" });
+    }
+
+    await sendReceiptEmail({
+      to: customerInfo.customer_gmail,
+      order,
+      customerName: customerInfo.customer_name,
+      items,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to send receipt email:", err);
+    res.status(500).json({ error: "Failed to send receipt email" });
+  }
+});
+
+
+async function sendReceiptEmail({ to, order, customerName, items }) {
+  const statusUrl = `${SITE_URL}/order-status.html?id=${order.id}`;
+
+  // Generate the QR as an image buffer (not a data URL) — email clients
+  // handle a real attached image far more reliably than inline base64.
+  const qrBuffer = await QRCode.toBuffer(statusUrl, { width: 200, margin: 1 });
+
+  const itemsHtml = items
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:4px 0;">${item.quantity} × ${item.name}</td>
+          <td style="padding:4px 0; text-align:right;">₱${(item.price * item.quantity).toFixed(2)}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 400px; margin: auto;">
+      <h2 style="color:#7a1f2b;">MusuGo Receipt</h2>
+      <p>Hi ${customerName}, thanks for your order!</p>
+
+      <p><strong>Order #${order.order_number}</strong></p>
+
+      <table style="width:100%; border-top:1px solid #eee; border-bottom:1px solid #eee; margin:12px 0;">
+        ${itemsHtml}
+      </table>
+
+      <p style="font-weight:bold; font-size:18px;">Total: ₱${Number(order.total).toFixed(2)}</p>
+
+      <p>Scan the QR code below anytime to check your order status:</p>
+      <img src="cid:receipt-qr" alt="Order status QR code" width="150" height="150" />
+
+      <p style="font-size:12px; color:#888;">
+        Or open this link: <a href="${statusUrl}">${statusUrl}</a>
+      </p>
+    </div>
+  `;
+
+  await mailTransporter.sendMail({
+    from: `"MusuGo" <${GMAIL_USER}>`,
+    to,
+    subject: `Your MusuGo Receipt - Order #${order.order_number}`,
+    html,
+    attachments: [
+      {
+        filename: "qrcode.png",
+        content: qrBuffer,
+        cid: "receipt-qr", // referenced by src="cid:receipt-qr" above
+      },
+    ],
+  });
+}
