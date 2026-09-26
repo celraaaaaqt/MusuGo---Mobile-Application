@@ -457,7 +457,7 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
       </table>
       <p style="font-weight:bold; font-size:18px;">Total: ₱${Number(order.total).toFixed(2)}</p>
       <p>Scan the QR code below anytime to check your order status:</p>
-      <img src="cid:receipt-qr" alt="Order status QR code" width="150" height="150" />
+            <img src="data:image/png;base64,${qrBase64}" alt="Order status QR code" width="150" height="150" />
       <p style="font-size:12px; color:#888;">
         Or open this link: <a href="${statusUrl}">${statusUrl}</a>
       </p>
