@@ -27,13 +27,14 @@ const paymongoAuth =
 
 const mailTransporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,      // 587 starts unencrypted, then upgrades via STARTTLS
+  requireTLS: true,   // enforce that upgrade — don't allow a silent plaintext fallback
   auth: {
     user: GMAIL_USER,
     pass: GMAIL_APP_PASSWORD,
   },
-  family: 4, // force IPv4 — Render's network can't reach Gmail's SMTP over IPv6
+  family: 4,
 });
 
 // Reused by the webhook and the /api/send-receipt endpoint — both need an
