@@ -96,7 +96,7 @@ function attachRatingListeners() {
       await pb.collection("customer_ratings").create({
         customer_order: orderId,
         customer_name: customerInfoId, // relation to the customer_info record
-        rating: String(selectedStars),
+        rating: selectedStars,
         feedback: feedbackText.value.trim(),
       });
 
