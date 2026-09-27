@@ -1,4 +1,5 @@
 import { pb } from '../lib/pb.js';
+import { syncCartBadges } from './cart.js';
 
 const productGrid = document.getElementById('product-grid');
 const categoryButtons = document.querySelectorAll('.category-btn');
@@ -25,45 +26,63 @@ function renderProducts(products) {
     const imageUrl = p.product_image ? pb.files.getURL(p, p.product_image) : null;
     const inStock = (p.stocks ?? 0) > 0;
 
-    return `
-      <article
-        class="product-card group bg-white rounded-3xl border border-primary-800 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition ${inStock ? '' : 'opacity-50 grayscale'}"
-        data-category="${categoryName}"
-        data-name="${p.product_name}"
-      >
-        <div class="aspect-square bg-gradient-to-br from-primary-50 to-tertiary-50 flex items-center justify-center relative">
-          ${imageUrl
-            ? `<img class="w-full h-full object-cover" src="${imageUrl}" alt="${p.product_name}" />`
-            : `<span class="text-neutral-400 text-sm">No image</span>`
-          }
-          ${!inStock ? `
-            <span class="absolute top-2 left-2 px-3 py-1 rounded-full bg-neutral-800/80 text-white text-xs font-semibold">
-              Out of stock
-            </span>
-          ` : ''}
+   return `
+  <article
+    class="product-card group relative bg-white rounded-3xl border border-primary-300 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] transition-all duration-200"
+    data-category="${categoryName}"
+    data-name="${p.product_name}"
+    data-id="${p.id}"
+  >
+    <div class="aspect-square bg-gradient-to-br from-primary-50 to-tertiary-50 relative overflow-hidden">
+      ${imageUrl
+        ? `<img class="w-full h-full object-cover ${inStock ? 'group-hover:scale-105 transition-transform duration-300' : 'grayscale'}" src="${imageUrl}" alt="${p.product_name}" />`
+        : `<div class="w-full h-full flex items-center justify-center text-neutral-400 text-sm">No image</div>`
+      }
+
+      ${categoryName ? `
+        <span class="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-primary-100 backdrop-blur-sm text-primary-800 text-[11px] font-bold uppercase tracking-wide shadow-sm">
+          ${categoryName}
+        </span>
+      ` : ''}
+
+      <span
+        class="cart-qty-badge absolute top-2 right-2 min-w-[22px] h-[22px] px-1.5 rounded-full bg-primary-600 text-white text-xs font-bold items-center justify-center shadow-sm hidden"
+        data-qty-for="${p.id}"
+      ></span>
+
+      ${!inStock ? `
+        <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-[1px] flex items-center justify-center">
+          <span class="px-4 py-1.5 rounded-full bg-primary-200 text-primary-800 text-xs font-bold uppercase tracking-wide">
+            Out of Stock
+          </span>
         </div>
-        <div class="p-4">
-          <h4 class="font-jakarta font-bold text-base text-primary-800">${p.product_name}</h4>
-          <div class="flex items-center justify-between mt-4">
-            <span class="font-jakarta font-bold text-lg text-secondary-600">₱${p.price}</span>
-            <button
-              class="add-cart w-12 h-12 rounded-xl text-white flex items-center justify-center text-2xl font-medium transition ${
-                inStock
-                  ? 'bg-primary-500 hover:bg-primary-600 active:scale-90'
-                  : 'bg-neutral-300 cursor-not-allowed'
-              }"
-              data-id="${p.id}"
-              data-name="${p.product_name}"
-              data-price="${p.price}"
-              ${inStock ? '' : 'disabled'}
-            >
-              +
-            </button>
-          </div>
-        </div>
-      </article>
-    `;
+      ` : ''}
+    </div>
+
+    <div class="p-5">
+      <h4 class="font-jakarta font-bold text-sm sm:text-base md:text-lg text-primary-800 leading-snug line-clamp-2 min-h-[2.5em]">${p.product_name}</h4>
+      <div class="flex items-center justify-between mt-3">
+        <span class="font-jakarta font-bold text-lg text-secondary-600">₱${p.price}</span>
+        <button
+          class="add-cart w-11 h-11 rounded-xl text-white flex items-center justify-center text-xl font-medium transition active:scale-90 ${
+            inStock
+              ? 'bg-primary-500 hover:bg-primary-600 shadow-sm shadow-primary-500/30'
+              : 'bg-neutral-300 cursor-not-allowed'
+          }"
+          data-id="${p.id}"
+          data-name="${p.product_name}"
+          data-price="${p.price}"
+          ${inStock ? '' : 'disabled'}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  </article>
+`;
   }).join('');
+
+  syncCartBadges();
 }
 
 // re-applies the currently selected category filter (used after every render,

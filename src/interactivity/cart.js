@@ -190,6 +190,26 @@ function showErrorToast(message) {
   }, 2000);
 }
 
+
+// Reflects current cart quantities onto any visible product-card badges.
+// Called whenever the cart changes, and once after the grid re-renders.
+export function syncCartBadges() {
+  document.querySelectorAll(".cart-qty-badge").forEach((badge) => {
+    const productId = badge.dataset.qtyFor;
+    const item = cart.find((i) => i.id === productId);
+
+    if (item && item.quantity > 0) {
+      badge.textContent = item.quantity;
+      badge.classList.remove("hidden");
+      badge.classList.add("flex");
+    } else {
+      badge.textContent = "";
+      badge.classList.add("hidden");
+      badge.classList.remove("flex");
+    }
+  });
+}
+
 //for updaating cart count
 function updateCartCount() {
 
@@ -200,6 +220,7 @@ function updateCartCount() {
 
   cartCount.textContent = totalQuantity;
 
+   syncCartBadges();
 }
 
 //cart data renderer
