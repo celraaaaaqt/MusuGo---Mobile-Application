@@ -388,6 +388,53 @@ app.post("/api/cancel-order", express.json(), async (req, res) => {
   }
 });
 
+
+// Marks a Cash order as paid + its payment record Complete, in one call.
+// Runs server-side with superuser auth since orders/payment are locked to
+// superuser-only updates (anonymous kiosk clients can't do this directly).
+app.post("/api/mark-cash-paid", express.json(), async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ error: "orderId is required" });
+  }
+
+  try {
+    const pb = new PocketBase(POCKETBASE_URL);
+    await pb.collection("_superusers").authWithPassword(
+      PB_SUPERUSER_EMAIL,
+      PB_SUPERUSER_PASSWORD
+    );
+
+    const order = await pb.collection("orders").getOne(orderId);
+
+    if (order.payment_status === "Paid") {
+      return res.json({ ok: true, skipped: true, reason: "already_paid" });
+    }
+
+    const paymentRecord = await pb
+      .collection("payment")
+      .getFirstListItem(`order="${orderId}"`);
+
+    if (paymentRecord.payment_method !== "Cash") {
+      return res.status(400).json({
+        error: "This endpoint only handles Cash orders. Use the GCash flow for that payment method.",
+      });
+    }
+
+    await pb.collection("orders").update(orderId, { payment_status: "Paid" });
+    await pb.collection("payment").update(paymentRecord.id, { status: "Complete" });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("mark-cash-paid failed:", err);
+    res.status(500).json({
+      error: "Failed to mark order as paid",
+      detail: err?.data ? JSON.stringify(err.data) : (err?.message || String(err)),
+    });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
 app.get("/health", (req, res) => {
