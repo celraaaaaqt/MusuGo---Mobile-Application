@@ -81,7 +81,7 @@ function attachRatingListeners() {
     });
   });
 
-  submitRatingBtn.addEventListener("click", async () => {
+ submitRatingBtn.addEventListener("click", async () => {
     if (selectedStars === 0) {
       alert("Please select a star rating first.");
       return;
@@ -90,12 +90,12 @@ function attachRatingListeners() {
     submitRatingBtn.disabled = true;
 
     try {
-      const customerInfoId =
-        currentOrder?.expand?.customer_info_via_orders?.[0]?.id;
+      const customerName =
+        currentOrder?.expand?.customer_info_via_orders?.[0]?.customer_name || "Unknown";
 
       await pb.collection("customer_ratings").create({
         customer_order: orderId,
-        customer_name: customerInfoId, // relation to the customer_info record
+        customer_name: customerName, //plain text
         rating: selectedStars,
         feedback: feedbackText.value.trim(),
       });
