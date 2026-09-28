@@ -38,13 +38,32 @@ const doneOrder = document.getElementById("done-order");
 //open checkout
 checkoutButton.addEventListener("click", () => {
 
+    const totalQuantity = getCart().reduce((sum, item) => sum + item.quantity, 0);
+  if (totalQuantity > 10) {
+    Swal.fire({
+      icon: "warning",
+      title: "Order limit exceeded",
+      text: "You can order up to 10 items per order. Please adjust your cart."
+    });
+    return;
+  }
+
   checkoutModal.classList.remove("hidden");
   cartModal.classList.add("hidden");
 
+  // reset payment UI
+  cashSection.classList.add("hidden");
+  gcashSection.classList.add("hidden");
+  cashReceived.value = "";
+  cashChange.textContent = "₱0.00";
+  // put both buttons back to the unselected look
+  [cashPayment, gcashPayment].forEach((btn) => {
+    btn.classList.remove("bg-primary-800", "text-white", "border-primary-600");
+    btn.classList.add("bg-white", "text-neutral-700", "border-neutral-200");
+  });
+
   renderCheckout();
-
 });
-
 
 
 //close checkout
@@ -78,28 +97,16 @@ function renderCheckout() {
 
   //if cart is empty
   if (cart.length === 0) {
-
     checkoutItems.innerHTML = `
       <p class="text-center text-neutral-500 py-6">
         Your cart is empty.
       </p>
     `;
 
-    checkoutTotal.textContent = "₱0";
-
-    return;
+  checkoutTotal.textContent = "₱0.00";
+gcashTotal.textContent = "₱0.00";
+return;
   }
-  const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-if (totalQuantity > 10) {
-  Swal.fire({
-    icon: "warning",
-    title: "Order limit exceeded",
-    text: "You can order up to 10 items per order. Please adjust your cart."
-  });
-
-  return;
-}
 
   //display each items
   cart.forEach((item) => {
@@ -148,65 +155,28 @@ if (totalQuantity > 10) {
   checkoutTotal.textContent =
     `₱${total.toFixed(2)}`;
 
+    updatePaymentTotal();
 }
-
-function selectCash() {
-  cashPayment.classList.add(
-    "bg-primary-800",
-    "text-white",
-    "border-primary-600"
-  );
-
-  cashPayment.classList.remove(
-    "bg-white",
-    "text-neutral-700",
-    "border-neutral-200"
-  );
-
-  gcashPayment.classList.add(
-    "bg-white",
-    "text-neutral-700",
-    "border-neutral-200"
-  );
-
-  gcashPayment.classList.remove(
-    "bg-primary-500",
-    "text-white",
-    "border-primary-500"
-  );
-}
-
-
-function selectGCash() {
-  gcashPayment.classList.add(
-    "bg-primary-800",
-    "text-white",
-    "border-primary-600"
-  );
-
-  gcashPayment.classList.remove(
-    "bg-white",
-    "text-neutral-700",
-    "border-neutral-200"
-  );
-
-  cashPayment.classList.add(
-    "bg-white",
-    "text-neutral-700",
-    "border-neutral-200"
-  );
-
-  cashPayment.classList.remove(
-    "bg-primary-500",
-    "text-white",
-    "border-primary-500"
-  );
-}
-
 
 //PAYMenT METHOD
+  function selectCash() {
+    cashPayment.classList.add("bg-primary-800", "text-white", "border-primary-600");
+    cashPayment.classList.remove("bg-white", "text-neutral-700", "border-neutral-200");
 
-// Cash payment
+    gcashPayment.classList.add("bg-white", "text-neutral-700", "border-neutral-200");
+    gcashPayment.classList.remove("bg-primary-800", "text-white", "border-primary-600");
+  }
+
+function selectGCash() {
+  gcashPayment.classList.add("bg-primary-800", "text-white", "border-primary-600");
+  gcashPayment.classList.remove("bg-white", "text-neutral-700", "border-neutral-200");
+
+  cashPayment.classList.add("bg-white", "text-neutral-700", "border-neutral-200");
+  cashPayment.classList.remove("bg-primary-800", "text-white", "border-primary-600");
+}
+
+
+//cash payment
 cashPayment.addEventListener("click", () => {
 
       selectCash();
@@ -233,7 +203,7 @@ selectGCash();
 function updatePaymentTotal() {
 
   const cart =
-    JSON.parse(localStorage.getItem("cart")) || [];
+    getCart();
 
   let total = 0;
 
@@ -250,8 +220,7 @@ function updatePaymentTotal() {
 //calculate change
 cashReceived.addEventListener("input", () => {
 
-  const cart =
-    JSON.parse(localStorage.getItem("cart")) || [];
+  const cart = getCart();
 
   let total = 0;
 
@@ -294,7 +263,15 @@ placeOrder.addEventListener("click", async () => {
 
     return;
   }
-
+const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+if (totalQuantity > 10) {
+  Swal.fire({
+    icon: "warning",
+    title: "Order limit exceeded",
+    text: "You can order up to 10 items per order. Please adjust your cart."
+  });
+  return;
+}
 
   // Calculate total
   let total = 0;
@@ -434,40 +411,32 @@ placeOrder.addEventListener("click", async () => {
     processingModal.classList.remove("hidden");
     processingModal.classList.add("flex");
 
+       const decrementedItems = [];
+     let stockAlreadyReleased = false;
         try {
-  // Step A: create one cart_items record per product line + deduct stock
+  //create one cart_items record per product line + deduct stock
  const cartItemIds = [];
-  const decrementedItems = [];
 
-  for (const item of cart) {
-    try {
-      await pb.collection('products').update(item.id, {
-        "stocks-": item.quantity,
-      });
-      decrementedItems.push(item);
-    } catch (stockErr) {
-      for (const restoreItem of decrementedItems) {
+      for (const item of cart) {
         try {
-          await pb.collection('products').update(restoreItem.id, {
-            "stocks+": restoreItem.quantity,
+          await pb.collection('products').update(item.id, {
+            "stocks-": item.quantity,
           });
-        } catch (restoreErr) {
-          console.error('Failed to restore stock for', restoreItem.id, restoreErr);
+          decrementedItems.push(item);
+        } catch (stockErr) {
+          const outOfStockError = new Error(`Sorry, "${item.name}" doesn't have enough stock left.`);
+          outOfStockError.userFacing = true;
+          throw outOfStockError;
         }
-      }
-      const outOfStockError = new Error(`Sorry, "${item.name}" doesn't have enough stock left.`);
-      outOfStockError.userFacing = true;
-      throw outOfStockError;
-    }
 
-    const cartItem = await pb.collection('cart_items').create({
-      product: item.id,
-      quantity: item.quantity,
-      price: item.price,
-      subtotal: item.price * item.quantity,
-    });
-    cartItemIds.push(cartItem.id);
-  }
+        const cartItem = await pb.collection('cart_items').create({
+          product: item.id,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity,
+        });
+        cartItemIds.push(cartItem.id);
+      }
 
   //order number depends on the current date and time
 const now = new Date();
@@ -536,10 +505,11 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
       orderId: order.id,
       orderNumber: order.order_number,
     });
-  } catch (qrErr) {
-    await releaseOrder({ orderId: order.id, paymentId: payment.id, items: orderedItems });
-    throw qrErr;
-  }
+        } catch (qrErr) {
+        await releaseOrder({ orderId: order.id, paymentId: payment.id, items: orderedItems });
+        stockAlreadyReleased = true;
+        throw qrErr;
+      }
 
   clearCart();
 
@@ -555,19 +525,31 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
     },
   });
 
-} catch (err) {
-  console.error('Order failed:', err);
+      } catch (err) {
+      console.error('Order failed:', err);
 
-  processingModal.classList.add("hidden");
-  processingModal.classList.remove("flex");
-  checkoutModal.classList.remove("hidden");
+      if (!stockAlreadyReleased) {
+        for (const restoreItem of decrementedItems) {
+          try {
+            await pb.collection('products').update(restoreItem.id, {
+              "stocks+": restoreItem.quantity,
+            });
+          } catch (restoreErr) {
+            console.error('Failed to restore stock for', restoreItem.id, restoreErr);
+          }
+        }
+      }
 
-  Swal.fire({
-    icon: "error",
-    title: "Order failed",
+      processingModal.classList.add("hidden");
+      processingModal.classList.remove("flex");
+      checkoutModal.classList.remove("hidden");
+
+      Swal.fire({
+        icon: "error",
+        title: "Order failed",
         text: err.userFacing ? err.message : "Something went wrong while placing your order. Please try again."
-  });
-}
+      });
+    }
 
   });
 

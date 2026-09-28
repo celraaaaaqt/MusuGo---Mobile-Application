@@ -4,7 +4,6 @@ import cors from "cors";
 import crypto from "crypto";
 import PocketBase from "pocketbase";
 
-import nodemailer from "nodemailer";
 import QRCode from "qrcode";
 
 const app = express();
@@ -17,25 +16,12 @@ const {
   PB_SUPERUSER_EMAIL,
   PB_SUPERUSER_PASSWORD,
   GMAIL_USER,
-  GMAIL_APP_PASSWORD,
   SITE_URL,
 } = process.env;
 
 // PayMongo needs "Basic base64(secret_key:)" auth
 const paymongoAuth =
   "Basic " + Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString("base64");
-
-const mailTransporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,      // 587 starts unencrypted, then upgrades via STARTTLS
-  requireTLS: true,   // enforce that upgrade — don't allow a silent plaintext fallback
-  auth: {
-    user: GMAIL_USER,
-    pass: GMAIL_APP_PASSWORD,
-  },
-  family: 4,
-});
 
 // Reused by the webhook and the /api/send-receipt endpoint — both need an
 // authenticated superuser client to read orders/customer_info.
@@ -49,7 +35,7 @@ async function getSuperuserPb() {
 }
 
 async function getReceiptData(orderId) {
-  const pb = await getSuperuserPb();
+   const pb = await getSuperuserPb();
 
   const order = await pb.collection("orders").getOne(orderId, {
     expand: "cart_items,cart_items.product",
@@ -59,7 +45,7 @@ async function getReceiptData(orderId) {
   // with an "orders" relation pointing back, so we look it up separately.
   const customerInfo = await pb
     .collection("customer_info")
-    .getFirstListItem(`orders = "${orderId}"`)
+    .getFirstListItem(pb.filter("orders = {:id}", { id: orderId }))
     .catch(() => null);
 
   const items = (order.expand?.cart_items || []).map((ci) => ({
@@ -91,44 +77,6 @@ async function paymongoRequest(path, body) {
   return { ok: response.ok, status: response.status, data };
 }
 
-// 1) Frontend calls this right after the order/payment records are
-//    created with status "Pending" — creates a PayMongo Payment Intent
-//    and hands back the client_key the frontend needs next.
-app.post("/api/create-intent", express.json(), async (req, res) => {
-  const { amount, orderId, orderNumber } = req.body;
-
-  try {
-    const response = await fetch("https://api.paymongo.com/v1/payment_intents", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: paymongoAuth,
-      },
-      body: JSON.stringify({
-        data: {
-          attributes: {
-            amount: Math.round(amount * 100), // PayMongo uses centavos
-            currency: "PHP",
-            payment_method_allowed: ["qrph"],
-            description: `Order #${orderNumber}`,
-            metadata: { order_id: orderId }, // lets the webhook find the order later
-          },
-        },
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) return res.status(response.status).json(data);
-
-    res.json({
-      paymentIntentId: data.data.id,
-      clientKey: data.data.attributes.client_key,
-    });
-  } catch (err) {
-    console.error("create-intent failed:", err);
-    res.status(500).json({ error: "Failed to create payment intent" });
-  }
-});
 
 // 1b) QR Ph (GCash scan-to-pay) in one call: create the Payment Intent,
 //     create a qrph Payment Method, and attach them — all server-side,
@@ -136,20 +84,21 @@ app.post("/api/create-intent", express.json(), async (req, res) => {
 //     card data and don't need to touch the client's public key.
 //     Returns the base64 QR image the frontend renders directly.
 app.post("/api/create-qrph-intent", express.json(), async (req, res) => {
-  const {
-    amount,
-    orderId,
-    orderNumber,
-    billingName,
-    billingEmail,
-    billingPhone,
-  } = req.body;
+  const { orderId, billingName, billingEmail, billingPhone } = req.body;
 
-  if (!amount || !orderId) {
-    return res.status(400).json({ error: "amount and orderId are required" });
+  if (!orderId) {
+    return res.status(400).json({ error: "orderId is required" });
   }
 
   try {
+    const pbAdmin = await getSuperuserPb();
+    const order = await pbAdmin.collection("orders").getOne(orderId);
+    if (order.payment_status !== "Pending") {
+      return res.status(400).json({ error: "Order is not awaiting payment" });
+    }
+    const amount = order.total;
+    const orderNumber = order.order_number;
+
     // Step 1: create the Payment Intent
     const intent = await paymongoRequest("payment_intents", {
       data: {
@@ -345,41 +294,54 @@ app.post(
 // Cancels an unpaid GCash order: restores stock and marks order/payment cancelled.
 // Runs server-side so it can use superuser auth.
 app.post("/api/cancel-order", express.json(), async (req, res) => {
-  const { orderId, paymentId, items } = req.body;
+  const { orderId, paymentId } = req.body;
 
-  if (!orderId || !paymentId || !Array.isArray(items)) {
-    return res.status(400).json({ error: "orderId, paymentId, and items are required" });
+  if (!orderId || !paymentId) {
+    return res.status(400).json({ error: "orderId and paymentId are required" });
   }
 
   try {
-    const pb = new PocketBase(POCKETBASE_URL);
-    await pb.collection("_superusers").authWithPassword(
-      PB_SUPERUSER_EMAIL,
-      PB_SUPERUSER_PASSWORD
-    );
+    const pb = await getSuperuserPb();
 
-    // Guard against the client-side QR expiry timer racing the webhook:
-    // if the webhook already marked this order Paid, never cancel it or
-    // restore its stock, even if this call arrives after the timer fires.
-    const currentOrder = await pb.collection("orders").getOne(orderId);
-    if (currentOrder.payment_status === "Paid") {
+    const order = await pb.collection("orders").getOne(orderId, {
+      expand: "cart_items",
+    });
+
+    if (order.payment_status === "Paid") {
       console.warn(`cancel-order skipped: order ${orderId} is already Paid`);
       return res.json({ ok: true, skipped: true, reason: "already_paid" });
     }
+    if (order.payment_status === "Cancelled") {
+      return res.json({ ok: true, skipped: true, reason: "already_cancelled" });
+    }
 
+    // Claim the cancellation FIRST so a second call sees "Cancelled"
+    // and skips, instead of both calls restoring stock.
+    await pb.collection("orders").update(orderId, { payment_status: "Cancelled" });
+    await pb.collection("payment").update(paymentId, { status: "Cancelled" });
+
+    // Build the restore list from what was actually ordered, not from the browser.
+    const items = (order.expand?.cart_items || []).map((ci) => ({
+      id: ci.product,
+      quantity: ci.quantity,
+    }));
+
+    const failed = [];
     for (const item of items) {
       try {
         await pb.collection("products").update(item.id, { "stocks+": item.quantity });
       } catch (err) {
+        failed.push(item.id);
         console.error("Failed to restore stock for", item.id, err);
       }
     }
 
-    await pb.collection("orders").update(orderId, { payment_status: "Cancelled" });
-    await pb.collection("payment").update(paymentId, { status: "Cancelled" });
+    if (failed.length) {
+      console.error(`RECONCILE NEEDED: order ${orderId} cancelled, stock not restored for`, failed);
+    }
 
-    res.json({ ok: true });
-    } catch (err) {
+    res.json({ ok: true, restoreFailed: failed });
+  } catch (err) {
     console.error("cancel-order failed:", err);
     res.status(500).json({
       error: "Failed to cancel order",
@@ -444,6 +406,128 @@ app.get("/health", (req, res) => {
   });
 });
 
+
+const fail = (status, message) =>
+  Object.assign(new Error(message), { status, userFacing: true });
+
+app.post("/api/place-order", express.json(), async (req, res) => {
+  const { items, paymentMethod, customer } = req.body || {};
+
+  try {
+    // ---- validate input ----
+    if (!Array.isArray(items) || items.length === 0) throw fail(400, "Your cart is empty.");
+    if (!["Cash", "GCash"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
+    if (!customer?.name || !/^\S+@\S+\.\S+$/.test(customer.email || "")) {
+      throw fail(400, "Please provide a valid name and email.");
+    }
+
+    const wanted = new Map(); // merge duplicate product lines
+    for (const it of items) {
+      const qty = Number(it.quantity);
+      if (typeof it.id !== "string" || !Number.isInteger(qty) || qty < 1) {
+        throw fail(400, "Invalid item in cart.");
+      }
+      wanted.set(it.id, (wanted.get(it.id) || 0) + qty);
+    }
+    const totalQty = [...wanted.values()].reduce((a, b) => a + b, 0);
+    if (totalQty > 10) throw fail(400, "You can order up to 10 items per order.");
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
+  }
+
+  let pb;
+  const reserved = [];   // stock we deducted, so we can undo it
+  let orderId = null;
+
+  try {
+   pb = await getSuperuserPb();
+    // ---- reserve stock using REAL prices from the database ----
+    const lines = [];
+    for (const [id, qty] of wanted) {
+      const product = await pb.collection("products").getOne(id).catch(() => null);
+      if (!product || product.is_active === false) {
+        throw fail(409, "An item in your cart is no longer available.");
+      }
+      if (product.stocks < qty) {
+        throw fail(409, `Sorry, "${product.product_name}" doesn't have enough stock left.`);
+      }
+     try {
+  await pb.collection("products").update(id, { "stocks-": qty });
+} catch {
+  throw fail(409, `Sorry, "${product.product_name}" doesn't have enough stock left.`);
+}
+reserved.push({ id, quantity: qty });
+      lines.push({ product, qty });
+    }
+
+    // ---- create records ----
+    const cartItemIds = [];
+    let total = 0;
+    for (const { product, qty } of lines) {
+      const subtotal = product.price * qty;
+      total += subtotal;
+      const ci = await pb.collection("cart_items").create({
+        product: product.id,
+        quantity: qty,
+        price: product.price,
+        subtotal,
+      });
+      cartItemIds.push(ci.id);
+    }
+
+    const now = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    const orderNumber =
+      `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}-` +
+      `${p2(now.getHours())}${p2(now.getMinutes())}${p2(now.getSeconds())}`;
+
+    const order = await pb.collection("orders").create({
+      order_number: orderNumber,
+      cart_items: cartItemIds,
+      total,
+      payment_status: "Pending",
+    });
+    orderId = order.id;
+
+    await pb.collection("customer_info").create({
+      orders: order.id,
+      customer_name: customer.name,
+      customer_gmail: customer.email,
+      customer_contact: customer.contact,
+    });
+
+    const payment = await pb.collection("payment").create({
+      order: order.id,
+      amount: total,
+      payment_method: paymentMethod,
+      status: "Pending",
+    });
+
+    res.json({
+      order: { id: order.id, order_number: order.order_number, total },
+      paymentId: payment.id,
+    });
+    } catch (err) {
+    console.error("place-order failed:", err);
+
+    if (pb) {
+      for (const r of reserved) {
+        await pb.collection("products")
+          .update(r.id, { "stocks+": r.quantity })
+          .catch((e) => console.error("Failed to restore stock for", r.id, e));
+      }
+      if (orderId) {
+        await pb.collection("orders")
+          .update(orderId, { payment_status: "Cancelled" })
+          .catch(() => {});
+      }
+    }
+
+    if (err.userFacing) return res.status(err.status).json({ error: err.message });
+    res.status(500).json({ error: "Something went wrong while placing your order." });
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Payment server running on port ${PORT}`);
 });
@@ -478,6 +562,11 @@ app.post("/api/send-receipt", express.json(), async (req, res) => {
 });
 
 
+const escapeHtml = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+
 async function sendReceiptEmail({ to, order, customerName, items }) {
   const statusUrl = `${SITE_URL}/order-status.html?id=${order.id}`;
   const qrBuffer = await QRCode.toBuffer(statusUrl, { width: 200, margin: 1 });
@@ -487,7 +576,7 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
     .map(
       (item) => `
         <tr>
-          <td style="padding:4px 0;">${item.quantity} × ${item.name}</td>
+          <td style="padding:4px 0;">${item.quantity} × ${escapeHtml(item.name)}</td>
           <td style="padding:4px 0; text-align:right;">₱${(item.price * item.quantity).toFixed(2)}</td>
         </tr>
       `
@@ -497,13 +586,13 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
   const html = `
     <div style="font-family: sans-serif; max-width: 400px; margin: auto;">
       <h2 style="color:#7a1f2b;">MusuGo Receipt</h2>
-      <p>Hi ${customerName}, thanks for your order!</p>
+      <p>Hi ${escapeHtml(customerName)}, thank you for ordering @MusuGo!</p>
       <p><strong>Order #${order.order_number}</strong></p>
       <table style="width:100%; border-top:1px solid #eee; border-bottom:1px solid #eee; margin:12px 0;">
-        ${itemsHtml}
+        ${itemsHtml}  
       </table>
       <p style="font-weight:bold; font-size:18px;">Total: ₱${Number(order.total).toFixed(2)}</p>
-      <p>Scan the QR code below anytime to check your order status:</p>
+      <p>A QR code for checking your order status is attached to this email.</p>
       <p style="font-size:12px; color:#888;">
         Or open this link: <a href="${statusUrl}">${statusUrl}</a>
       </p>

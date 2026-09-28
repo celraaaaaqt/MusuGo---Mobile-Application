@@ -8,3 +8,4 @@
 
 node_modules/
 src-tauri/
+keystore.properties
