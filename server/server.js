@@ -561,6 +561,42 @@ app.post("/api/send-receipt", express.json(), async (req, res) => {
   }
 });
 
+app.post("/api/submit-rating", express.json(), async (req, res) => {
+  const { orderId, rating, feedback } = req.body || {};
+  const stars = Number(rating);
+  if (typeof orderId !== "string" || !Number.isInteger(stars) || stars < 1 || stars > 5) {
+    return res.status(400).json({ error: "Invalid rating." });
+  }
+
+  try {
+    const pb = await getSuperuserPb();
+    const order = await pb.collection("orders").getOne(orderId);
+
+    const info = await pb
+      .collection("customer_info")
+      .getFirstListItem(pb.filter("orders = {:id}", { id: order.id }))
+      .catch(() => null);
+
+    // one rating per order (remove these 4 lines if repeat ratings are allowed)
+    const existing = await pb
+      .collection("customer_ratings")
+      .getFirstListItem(pb.filter("customer_order = {:id}", { id: order.id }))
+      .catch(() => null);
+    if (existing) return res.status(409).json({ error: "This order was already rated." });
+
+        await pb.collection("customer_ratings").create({
+      customer_order: order.id,
+      customer_name: info?.id,            // relation to customer_info
+      rating: String(stars),              // rating is a select field
+      feedback: String(feedback ?? "").slice(0, 500),
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("submit-rating failed:", err);
+    res.status(500).json({ error: "Could not save your rating." });
+  }
+});
 
 const escapeHtml = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({
