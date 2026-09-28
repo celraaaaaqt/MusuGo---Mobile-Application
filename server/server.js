@@ -572,10 +572,15 @@ app.post("/api/submit-rating", express.json(), async (req, res) => {
     const pb = await getSuperuserPb();
     const order = await pb.collection("orders").getOne(orderId);
 
-    const info = await pb
-      .collection("customer_info")
-      .getFirstListItem(pb.filter("orders = {:id}", { id: order.id }))
-      .catch(() => null);
+  const info = await pb
+  .collection("customer_info")
+  .getFirstListItem(pb.filter("orders = {:id}", { id: order.id }))
+  .catch((err) => {
+    console.error("customer_info lookup failed for order", order.id, ":", err?.data || err?.message || err);
+    return null;
+  });
+
+console.log("customer_info lookup result for order", order.id, ":", info);
 
     const existing = await pb
       .collection("customer_ratings")
