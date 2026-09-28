@@ -654,7 +654,7 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
       attachment: [
         {
           content: qrBase64,
-          name: "qrcode.png",
+          name: "qrcode_receipt.png",
         },
       ],
     }),

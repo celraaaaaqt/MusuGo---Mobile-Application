@@ -3,6 +3,7 @@ import { syncCartBadges } from './cart.js';
 
 const productGrid = document.getElementById('product-grid');
 const categoryButtons = document.querySelectorAll('.category-btn');
+const searchInput = document.getElementById('search-input');
 
 let currentCategory = 'all';
 
@@ -14,7 +15,7 @@ async function loadProducts() {
       expand: 'product_category', //pulls in the related category record
     });
     renderProducts(products);
-    applyCategoryFilter();
+    applyFilters();
   } catch (err) {
     console.error('Failed to load products:', err);
   }
@@ -85,13 +86,22 @@ function renderProducts(products) {
   syncCartBadges();
 }
 
-// re-applies the currently selected category filter (used after every render,
-// including realtime re-renders, so out-of-stock refresh doesn't reset the filter)
-function applyCategoryFilter() {
+// Combined filter — checks BOTH the selected category AND the search text
+// together, so they never fight over the same .hidden class. Called after
+// every render (including realtime re-renders), every category click, and
+// every search keystroke.
+function applyFilters() {
+  const searchText = (searchInput?.value || '').toLowerCase();
   const productCards = document.querySelectorAll('.product-card');
+
   productCards.forEach((card) => {
     const productCategory = card.dataset.category;
-    if (currentCategory === 'all' || productCategory === currentCategory) {
+    const productName = card.dataset.name.toLowerCase();
+
+    const matchesCategory = currentCategory === 'all' || productCategory === currentCategory;
+    const matchesSearch = productName.includes(searchText);
+
+    if (matchesCategory && matchesSearch) {
       card.classList.remove('hidden');
     } else {
       card.classList.add('hidden');
@@ -113,12 +123,19 @@ function attachCategoryFilter() {
       button.classList.remove('bg-white', 'text-secondary-600', 'border-neutral-200');
       button.classList.add('bg-primary-800', 'text-white', 'border-primary-800');
 
-      applyCategoryFilter();
+      applyFilters();
     });
   });
 }
 
+// attaches the search input listener once — same pattern as category buttons
+function attachSearchFilter() {
+  if (!searchInput) return;
+  searchInput.addEventListener('input', applyFilters);
+}
+
 attachCategoryFilter();
+attachSearchFilter();
 loadProducts();
 
 // keep stock status live: whenever any product record changes (e.g. an admin
