@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "musugo-app",
-  "version": "0.1.0",
+  "productName": "MusuGo!",
+  "version": "0.1.1",
   "identifier": "com.arcel.musugo-app",
   "build": {
     "frontendDist": "../dist",
