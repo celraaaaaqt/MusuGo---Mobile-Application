@@ -90,22 +90,30 @@ function attachRatingListeners() {
     submitRatingBtn.disabled = true;
 
     try {
-      const customerName =
-        currentOrder?.expand?.customer_info_via_orders?.[0]?.customer_name || "Unknown";
+      const response = await fetch(
+        `${import.meta.env.VITE_PAYMENT_SERVER_URL}/api/submit-rating`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId,
+            rating: selectedStars,
+            feedback: feedbackText.value.trim(),
+          }),
+        }
+      );
 
-      await pb.collection("customer_ratings").create({
-        customer_order: orderId,
-        customer_name: customerName, //plain text
-        rating: selectedStars,
-        feedback: feedbackText.value.trim(),
-      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit rating.");
+      }
 
       ratingSection.innerHTML = `
         <p class="text-center text-sm text-neutral-500">Thanks for your feedback! ⭐</p>
       `;
     } catch (err) {
       console.error("Failed to submit rating:", err);
-      alert("Something went wrong submitting your rating. Please try again.");
+      alert(err.message || "Something went wrong submitting your rating. Please try again.");
       submitRatingBtn.disabled = false;
     }
   });
