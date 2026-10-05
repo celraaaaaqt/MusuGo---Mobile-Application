@@ -11,16 +11,12 @@ const statusStyles = {
   Cancelled: { label: "Cancelled", color: "text-red-600 bg-red-50" },
 };
 
-// Set once loadOrder() fetches successfully, read by the submit-rating
-// handler below — a normal module-level variable, since both live in
-// this one file (replaces the earlier window.__currentOrder idea).
+
 let currentOrder = null;
 
 const peso = (n) => `₱${Number(n || 0).toFixed(2)}`;
 
-// Payment numbers come from the payment server (/api/order-receipt/:id) because
-// the payment collection is locked to superusers, so the browser can't read it.
-// Returns { method, status, amountPaid, change } or null if unavailable.
+
 async function fetchPaymentInfo(id) {
   try {
     const res = await fetch(
