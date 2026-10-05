@@ -16,6 +16,54 @@ const statusStyles = {
 // this one file (replaces the earlier window.__currentOrder idea).
 let currentOrder = null;
 
+const peso = (n) => `₱${Number(n || 0).toFixed(2)}`;
+
+// Payment part of the receipt. Method is always shown; amount paid and change
+// only once the order is Paid.
+//   Cash     -> cash_received / change, as entered by staff in the staff app
+//   E-wallet -> exact amount was paid via QR, so amount = total and change = 0
+function buildPaymentSection(order, payment) {
+  if (!payment) return ""; // no payment record, or its View rule blocks anonymous reads
+
+  const total = Number(order.total) || 0;
+  const method = payment.payment_method || "";
+  const isCash = method === "Cash";
+
+  let rows = `
+    <div class="flex justify-between text-sm py-1">
+      <span class="text-neutral-500">Payment method</span>
+      <span class="font-semibold">${method}</span>
+    </div>
+  `;
+
+  if (order.payment_status === "Paid") {
+    const amountPaid = isCash
+      ? Number(payment.cash_received) || total
+      : Number(payment.amount) || total;
+
+    const change = isCash
+      ? Number(payment.change) || Math.max(0, amountPaid - total)
+      : 0;
+
+    rows += `
+      <div class="flex justify-between text-sm py-1">
+        <span class="text-neutral-500">Amount paid</span>
+        <span class="font-semibold">${peso(amountPaid)}</span>
+      </div>
+      <div class="flex justify-between text-sm py-1">
+        <span class="text-neutral-500">Change</span>
+        <span class="font-semibold">${peso(change)}</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="text-left border-t border-neutral-200 mt-3 pt-3">
+      ${rows}
+    </div>
+  `;
+}
+
 function buildRatingSection(order) {
   const alreadyRated =
     (order.expand?.customer_ratings_via_customer_order?.length || 0) > 0;
@@ -128,12 +176,13 @@ async function loadOrder() {
   try {
     const order = await pb.collection("orders").getOne(orderId, {
       expand:
-        "cart_items,cart_items.product,customer_info_via_orders,customer_ratings_via_customer_order",
+        "cart_items,cart_items.product,customer_info_via_orders,customer_ratings_via_customer_order,payment_via_order",
     });
 
     currentOrder = order;
 
     const items = order.expand?.cart_items || [];
+    const payment = [].concat(order.expand?.payment_via_order || [])[0] || null;
     const style = statusStyles[order.payment_status] || {
       label: order.payment_status,
       color: "text-neutral-600 bg-neutral-100",
@@ -167,6 +216,8 @@ async function loadOrder() {
         <span>Total</span>
         <span>₱${Number(order.total).toFixed(2)}</span>
       </div>
+
+      ${buildPaymentSection(order, payment)}
 
       ${buildRatingSection(order)}
     `;

@@ -48,13 +48,19 @@ async function getReceiptData(orderId) {
     .getFirstListItem(pb.filter("orders = {:id}", { id: orderId }))
     .catch(() => null);
 
+  // Same idea for payment: separate collection with an "order" relation.
+  const payment = await pb
+    .collection("payment")
+    .getFirstListItem(pb.filter("order = {:id}", { id: orderId }))
+    .catch(() => null);
+
   const items = (order.expand?.cart_items || []).map((ci) => ({
     name: ci.expand?.product?.product_name || "Item",
     quantity: ci.quantity,
     price: ci.price,
   }));
 
-  return { order, customerInfo, items };
+  return { order, customerInfo, items, payment };
 }
 
 // PayMongo signs webhooks differently per mode (test vs live) — figure out
@@ -260,13 +266,14 @@ app.post(
                     await pb.collection("orders").update(orderId, { payment_status: "Paid" });
 
           try {
-            const { order, customerInfo, items } = await getReceiptData(orderId);
+            const { order, customerInfo, items, payment } = await getReceiptData(orderId);
             if (customerInfo?.customer_gmail) {
               await sendReceiptEmail({
                 to: customerInfo.customer_gmail,
                 order,
                 customerName: customerInfo.customer_name,
                 items,
+                payment,
               });
             } else {
               console.warn(`No customer_info found for order ${orderId} — skipping email`);
@@ -416,7 +423,7 @@ app.post("/api/place-order", express.json(), async (req, res) => {
   try {
     // ---- validate input ----
     if (!Array.isArray(items) || items.length === 0) throw fail(400, "Your cart is empty.");
-    if (!["Cash", "via E-Wallet"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
+    if (!["Cash", "GCash"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
     if (!customer?.name || !/^\S+@\S+\.\S+$/.test(customer.email || "")) {
       throw fail(400, "Please provide a valid name and email.");
     }
@@ -541,7 +548,7 @@ app.post("/api/send-receipt", express.json(), async (req, res) => {
   }
 
   try {
-    const { order, customerInfo, items } = await getReceiptData(orderId);
+    const { order, customerInfo, items, payment } = await getReceiptData(orderId);
 
     if (!customerInfo?.customer_gmail) {
       return res.status(404).json({ error: "No customer info found for this order" });
@@ -552,6 +559,7 @@ app.post("/api/send-receipt", express.json(), async (req, res) => {
       order,
       customerName: customerInfo.customer_name,
       items,
+      payment,
     });
 
     res.json({ success: true });
@@ -607,7 +615,7 @@ const escapeHtml = (s) =>
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 
-async function sendReceiptEmail({ to, order, customerName, items }) {
+async function sendReceiptEmail({ to, order, customerName, items, payment }) {
   const statusUrl = `${SITE_URL}/order-status.html?id=${order.id}`;
   const qrBuffer = await QRCode.toBuffer(statusUrl, { width: 200, margin: 1 });
   const qrBase64 = qrBuffer.toString("base64");
@@ -623,6 +631,37 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
     )
     .join("");
 
+  // Amount paid / change rows.
+  //  - E-wallet (QR): the exact total was paid, so change is 0.
+  //  - Cash: staff enter cash_received/change later in the staff app, and the
+  //    cash receipt email goes out at order time, so these rows only appear
+  //    when staff already filled them in (otherwise they're left out).
+  const total = Number(order.total) || 0;
+  const isCash = payment?.payment_method === "Cash";
+  const amountPaid = !payment
+    ? 0
+    : isCash
+      ? Number(payment.cash_received) || 0
+      : Number(payment.amount) || total;
+  const change = isCash
+    ? Number(payment?.change) || Math.max(0, amountPaid - total)
+    : 0;
+
+  const paymentHtml = amountPaid > 0
+    ? `
+      <table style="width:100%; margin:0 0 12px;">
+        <tr>
+          <td style="padding:2px 0; color:#555;">Amount paid</td>
+          <td style="padding:2px 0; text-align:right;">₱${amountPaid.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding:2px 0; color:#555;">Change</td>
+          <td style="padding:2px 0; text-align:right;">₱${change.toFixed(2)}</td>
+        </tr>
+      </table>
+    `
+    : "";
+
   const html = `
     <div style="font-family: sans-serif; max-width: 400px; margin: auto;">
       <h2 style="color:#7a1f2b;">MusuGo Receipt</h2>
@@ -632,6 +671,7 @@ async function sendReceiptEmail({ to, order, customerName, items }) {
         ${itemsHtml}  
       </table>
       <p style="font-weight:bold; font-size:18px;">Total: ₱${Number(order.total).toFixed(2)}</p>
+      ${paymentHtml}
       <p>A QR code for checking your order status is attached to this email.</p>
       <p style="font-size:12px; color:#888;">
         Or open this link: <a href="${statusUrl}">${statusUrl}</a>
