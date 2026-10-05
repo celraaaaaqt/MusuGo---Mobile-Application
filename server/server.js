@@ -419,16 +419,16 @@ const fail = (status, message) =>
 
 app.post("/api/place-order", express.json(), async (req, res) => {
   const { items, paymentMethod, customer } = req.body || {};
-
+  const wanted = new Map(); // merge duplicate product lines
   try {
     // ---- validate input ----
     if (!Array.isArray(items) || items.length === 0) throw fail(400, "Your cart is empty.");
-    if (!["Cash", "GCash"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
+    if (!["Cash", "via E-Wallet"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
     if (!customer?.name || !/^\S+@\S+\.\S+$/.test(customer.email || "")) {
       throw fail(400, "Please provide a valid name and email.");
     }
 
-    const wanted = new Map(); // merge duplicate product lines
+  
     for (const it of items) {
       const qty = Number(it.quantity);
       if (typeof it.id !== "string" || !Number.isInteger(qty) || qty < 1) {
