@@ -539,6 +539,38 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Payment server running on port ${PORT}`);
 });
 
+
+// Public, read-only: just the payment numbers the customer receipt page needs.
+app.get("/api/order-receipt/:orderId", async (req, res) => {
+  try {
+    const pb = await getSuperuserPb();
+    const order = await pb.collection("orders").getOne(req.params.orderId, {
+      fields: "id,total,payment_status",
+    });
+    const payment = await pb
+      .collection("payment")
+      .getFirstListItem(pb.filter("order = {:id}", { id: order.id }))
+      .catch(() => null);
+
+    if (!payment) return res.json({ payment: null });
+
+    const total = Number(order.total) || 0;
+    const isCash = payment.payment_method === "Cash";
+    const amountPaid = isCash
+      ? Number(payment.cash_received) || total
+      : Number(payment.amount) || total;
+    const change = isCash
+      ? Number(payment.change) || Math.max(0, amountPaid - total)
+      : 0;
+
+    res.json({
+      payment: { method: payment.payment_method, status: payment.status, amountPaid, change },
+    });
+  } catch (err) {
+    res.status(404).json({ error: "Order not found" });
+  }
+});
+
 //customer receipt
 app.post("/api/send-receipt", express.json(), async (req, res) => {
   const { orderId } = req.body;
