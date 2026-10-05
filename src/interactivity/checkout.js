@@ -19,9 +19,6 @@ const gcashPayment = document.getElementById("gcash-payment");
 const cashSection = document.getElementById("cash-section");
 const gcashSection = document.getElementById("gcash-section");
 
-const cashReceived = document.getElementById("cash-received");
-const cashChange = document.getElementById("cash-change");
-
 const gcashTotal = document.getElementById("gcash-total");
 
 const placeOrder = document.getElementById("place-order");
@@ -54,8 +51,6 @@ checkoutButton.addEventListener("click", () => {
   // reset payment UI
   cashSection.classList.add("hidden");
   gcashSection.classList.add("hidden");
-  cashReceived.value = "";
-  cashChange.textContent = "₱0.00";
   // put both buttons back to the unselected look
   [cashPayment, gcashPayment].forEach((btn) => {
     btn.classList.remove("bg-primary-800", "text-white", "border-primary-600");
@@ -217,39 +212,6 @@ function updatePaymentTotal() {
 }
 
 
-//calculate change
-cashReceived.addEventListener("input", () => {
-
-  const cart = getCart();
-
-  let total = 0;
-
-  cart.forEach((item) => {
-    total += item.price * item.quantity;
-  });
-
-  const received =
-    Number(cashReceived.value);
-
-  const change =
-    received - total;
-
-  if (received <= 0) {
-    cashChange.textContent = "₱0.00";
-    return;
-  }
-
-  if (change < 0) {
-    cashChange.textContent = "Insufficient cash";
-    return;
-  }
-
-  cashChange.textContent =
-    `₱${change.toFixed(2)}`;
-
-});
-
-
 placeOrder.addEventListener("click", async () => {
 
   const cart = getCart();
@@ -287,20 +249,8 @@ if (totalQuantity > 10) {
   if (!cashSection.classList.contains("hidden")) {
     paymentMethod = "Cash";
 
-    const received = Number(cashReceived.value);
-
-    if (received < total) {
-      Swal.fire({
-        icon: "error",
-        title: "Insufficient cash",
-        text: "Please enter enough cash to complete the order."
-      });
-
-      return;
-    }
-
   } else if (!gcashSection.classList.contains("hidden")) {
-    paymentMethod = "GCash";
+    paymentMethod = "via E-Wallet";
 
   } else {
 
@@ -479,9 +429,6 @@ const orderNumber = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'
     checkoutModal.classList.add("hidden");
     orderSuccessModal.classList.remove("hidden");
     orderSuccessModal.classList.add("flex");
-
-    cashReceived.value = "";
-    cashChange.textContent = "₱0.00";
 
     // Cash orders skip the GCash webhook entirely, so this is the only
     // place their receipt email gets triggered. Not awaited on purpose —

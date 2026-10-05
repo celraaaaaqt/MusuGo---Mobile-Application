@@ -416,7 +416,7 @@ app.post("/api/place-order", express.json(), async (req, res) => {
   try {
     // ---- validate input ----
     if (!Array.isArray(items) || items.length === 0) throw fail(400, "Your cart is empty.");
-    if (!["Cash", "GCash"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
+    if (!["Cash", "via E-Wallet"].includes(paymentMethod)) throw fail(400, "Invalid payment method.");
     if (!customer?.name || !/^\S+@\S+\.\S+$/.test(customer.email || "")) {
       throw fail(400, "Please provide a valid name and email.");
     }
